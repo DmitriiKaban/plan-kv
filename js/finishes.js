@@ -269,6 +269,79 @@ export function makeFern(aniso = 4) {
   return { map: finish(cv, true, aniso), bump: null, cols: 1, rows: 1 };
 }
 
+// ── Полоска: шесть вертикальных полос по 8,8 см (рулон 53 см), чередуются светлые и чуть темнее,
+// по краю тёмной полосы — тонкая линия; под рисунком та же льняная фактура ──
+export function makeStripes(aniso = 4) {
+  const W = 512, H = 512;                     // 53 × 53 см
+  const cv = canvas(W, H), ctx = cv.getContext('2d');
+  linen(ctx, W, H, rng(4401));
+  const n = 6, sw = W / n;
+  for (let i = 1; i < n; i += 2) {
+    ctx.fillStyle = 'rgba(120,120,120,0.10)'; ctx.fillRect(i * sw, 0, sw, H);
+    ctx.fillStyle = 'rgba(90,90,90,0.16)';
+    ctx.fillRect(i * sw + 3, 0, 1.6, H); ctx.fillRect((i + 1) * sw - 4.6, 0, 1.6, H);
+  }
+  grain(ctx, W, H, 2, rng(12));
+  return { map: finish(cv, true, aniso), bump: null, cols: 1, rows: 1 };
+}
+
+// ── Декоративная штукатурка под бетон: мягкие облака и следы шпателя (повтор 1,2 × 1,2 м) ──
+export function makePlaster(aniso = 4) {
+  const W = 512, H = 512;
+  const cv = canvas(W, H), ctx = cv.getContext('2d');
+  const r = rng(5150);
+  ctx.fillStyle = '#f1f1f1'; ctx.fillRect(0, 0, W, H);
+  const wrap = (fn) => { for (const dx of [-W, 0, W]) for (const dy of [-H, 0, H]) fn(dx, dy); };
+  for (let i = 0; i < 70; i++) {                        // облака
+    const x = r() * W, y = r() * H, rad = 30 + r() * 110, dark = r() < 0.55;
+    const a = 0.03 + r() * 0.05, rgb = dark ? '150,150,150' : '255,255,255';
+    wrap((dx, dy) => blob(ctx, x + dx, y + dy, rad, rgb, a));
+  }
+  for (let i = 0; i < 140; i++) {                       // следы шпателя: вытянутые полупрозрачные мазки
+    const x = r() * W, y = r() * H, len = 25 + r() * 70, wd = 4 + r() * 12, ang = (r() - 0.5) * 1.4 + (r() < 0.5 ? 0 : Math.PI / 2);
+    ctx.fillStyle = r() < 0.5 ? `rgba(255,255,255,${0.05 + r() * 0.06})` : `rgba(140,140,140,${0.03 + r() * 0.05})`;
+    wrap((dx, dy) => { ctx.beginPath(); ctx.ellipse(x + dx, y + dy, len, wd, ang, 0, Math.PI * 2); ctx.fill(); });
+  }
+  for (let i = 0; i < 900; i++) {                       // поры
+    ctx.fillStyle = `rgba(110,110,110,${0.05 + r() * 0.1})`;
+    const sz = 0.6 + r() * 1.4;
+    ctx.fillRect(r() * W, r() * H, sz, sz);
+  }
+  grain(ctx, W, H, 3, rng(13));
+  return { map: finish(cv, true, aniso), bump: null, cols: 1, rows: 1 };
+}
+
+// ── Свои обои по фото: картинка (canvas) повторяется; её ширину на стене задают в карточке ──
+export function photoTexture(cv, aniso = 4) {
+  return { map: finish(cv, true, aniso), bump: null, cols: 1, rows: 1 };
+}
+
+// покраска отдельной стены: ровный матовый цвет
+export function paintMaterial(color, clip) {
+  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0 });
+  m.clippingPlanes = clip;
+  return m;
+}
+
+// превью покрытия для карточки: кусок стены viewMm × viewMm в масштабе; src — картинка текстуры
+// (repW × repH мм на всю картинку), color — оттенок (умножается, как в материале)
+export function drawCoverPreview(cv, src, repW, repH, color, viewMm = 450) {
+  const ctx = cv.getContext('2d'), S = cv.width;
+  ctx.save();
+  ctx.clearRect(0, 0, S, cv.height);
+  if (src) {
+    const pat = ctx.createPattern(src, 'repeat');
+    const k = S / viewMm;
+    pat.setTransform(new DOMMatrix().scale(k * repW / src.width, k * repH / src.height));
+    ctx.fillStyle = pat; ctx.fillRect(0, 0, S, cv.height);
+  } else { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, S, cv.height); }
+  if (color && color.toLowerCase() !== '#ffffff') {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = color; ctx.fillRect(0, 0, S, cv.height);
+  }
+  ctx.restore();
+}
+
 // вайя: стебель-дуга, перья по обе стороны, длиннее всего ближе к основанию, к верхушке мельче
 function frond(ctx, x0, y0, f, px) {
   const ux = Math.cos(f.a), uy = Math.sin(f.a), nx = -uy, ny = ux;

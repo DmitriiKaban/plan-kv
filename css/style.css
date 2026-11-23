@@ -82,7 +82,7 @@ code { font-size: .92em; background: var(--paper-2); padding: 1px 4px; border-ra
 .tools { position: absolute; left: 12px; top: calc(var(--top) + 56px); display: flex; flex-direction: column; gap: 4px; padding: 4px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; z-index: 4; }
 .tools button { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: var(--ink-2); }
 .tools button:hover:not(:disabled) { background: var(--paper-2); color: var(--ink); }
-.tools button[aria-pressed="true"] { background: var(--blue-2); color: var(--blue); }
+.tools button[aria-pressed="true"], .tools button[aria-pressed="true"]:hover { background: var(--blue-2); color: var(--blue); }
 .tools button:disabled { opacity: .35; cursor: default; }
 .tools .sep { height: 1px; background: var(--line); margin: 2px 6px; }
 #app:not([data-mode="orbit"]) #tCut { display: none; }
@@ -235,6 +235,40 @@ body.touch .walk-hint { display: none !important; }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
 #app:has(.inspector:not([hidden])) .toast { bottom: calc(var(--bottom) + 330px); }
 
+/* ── обои: валик, подсказка и карточка стены ── */
+.wall-hint { display: none; position: absolute; top: calc(var(--top) + 56px); left: 50%; transform: translateX(-50%); padding: 7px 8px 7px 14px; background: var(--paper); border: 1px solid var(--blue); border-radius: 20px; font-size: 13px; z-index: 4; white-space: nowrap; }
+#app.walling .wall-hint { display: block; }
+#app.walling:has(#wallCard:not([hidden])) .wall-hint { display: none; }
+#app.walling #scene { cursor: crosshair; }
+#app.walling .inspector:not(.wallcard) { display: none; }
+.wallcard .ins-head { align-items: flex-start; }
+.wc-title { flex: 1; display: flex; flex-direction: column; padding: 4px 0 0 4px; }
+.wc-title b { font-size: 16px; font-weight: 600; }
+.wc-title span { font-size: 13px; color: var(--ink-2); }
+.wc-now { margin: 6px 4px 10px; font-size: 13px; color: var(--ink-2); }
+.wc-now b { color: var(--ink); font-weight: 600; }
+.wc-now em { font-style: normal; color: var(--ink-3); margin-left: 6px; padding: 1px 6px; border-radius: 10px; background: var(--paper-2); font-size: 12px; }
+.covers { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px 6px; }
+.covers button, .covers .add-photo { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 11.5px; line-height: 1.2; color: var(--ink-2); cursor: pointer; text-align: center; }
+.covers canvas, .covers .add-photo i { display: block; width: 100%; aspect-ratio: 1; border-radius: 8px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .14); }
+.covers button[aria-pressed="true"] canvas { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--blue); }
+.covers button[aria-pressed="true"] span { color: var(--ink); font-weight: 600; }
+.covers span { max-width: 100%; overflow-wrap: anywhere; }
+.covers .add-photo i { display: grid; place-items: center; font-style: normal; font-size: 24px; color: var(--blue); background: var(--blue-2); box-shadow: inset 0 0 0 1.5px rgba(43, 69, 200, .35); }
+.covers .add-photo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.covers .add-photo:focus-within i { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--blue); }
+.wc-color { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px; }
+.wc-color > span, .wc-photo > span { flex: none; font-size: 13px; color: var(--ink-2); }
+.wc-color .swatches { gap: 5px; padding-left: 2px; }
+.wc-color .swatches button { width: 26px; height: 26px; }
+.wc-color .swatches input[type="color"] { width: 30px; height: 30px; }
+.wc-photo { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.wc-photo .unit { width: 92px; }
+.wc-photo .btn { margin-left: auto; }
+.ins-actions .btn:disabled { opacity: .45; cursor: default; }
+.wall-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 2px; }
+.wall-btns .btn { white-space: normal; height: auto; min-height: 36px; padding: 6px 10px; line-height: 1.25; }
+
 /* ── телефон ── */
 @media (max-width: 760px) {
   :root { --top: max(8px, env(safe-area-inset-top)); --bottom: max(8px, env(safe-area-inset-bottom)); }
@@ -258,6 +292,14 @@ body.touch .walk-hint { display: none !important; }
   #minimap { top: calc(var(--top) + 54px); right: 8px; bottom: auto; width: 132px; height: 120px; }
   #app.panel-open #minimap { right: 8px; }
   .measure-hint { top: auto; bottom: calc(var(--bottom) + 8px); white-space: normal; width: calc(100% - 16px); text-align: center; border-radius: 12px; }
+  .wall-hint { top: auto; bottom: calc(var(--bottom) + 8px); white-space: normal; width: calc(100% - 16px); text-align: center; border-radius: 12px; }
+  #app[data-mode="walk"].walling .wall-hint { bottom: calc(var(--bottom) + 150px); }
+  .wallcard { max-height: 50vh; }
+  .covers { display: flex; overflow-x: auto; gap: 8px; padding: 4px 2px 6px; margin: 0 -2px; scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+  .covers > * { flex: 0 0 60px; scroll-snap-align: start; }
+  .wc-color .swatches { flex-wrap: nowrap; overflow-x: auto; padding: 4px 2px; }
+  .wc-color .swatches > * { flex: none; }
+  #app[data-mode="walk"]:has(#wallCard:not([hidden])) .joystick { bottom: calc(var(--bottom) + min(50vh, 330px)); }
   .toast, #app:has(.inspector:not([hidden])) .toast { top: calc(var(--top) + 54px); bottom: auto; transform: translate(-50%, -12px); }
   .toast.on, #app:has(.inspector:not([hidden])) .toast.on { transform: translate(-50%, 0); }
   #app[data-mode="orbit"] .lbl.room .s { display: none; }

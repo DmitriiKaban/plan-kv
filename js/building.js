@@ -2,7 +2,7 @@
 // стены с проёмами, окна, двери, ламинат, потолок, зоны открывания дверей.
 import * as THREE from 'three';
 import { makeLaminate } from './laminate.js';
-import { makeBrick, makeTile, makeSlab, makeLinen, makeFern, finishMaterial } from './finishes.js';
+import { makeBrick, makeTile, makeSlab, makeLinen, makeFern, makeStripes, makePlaster, photoTexture, paintMaterial, finishMaterial } from './finishes.js';
 import { woodMat, woodUV } from './catalog.js';
 
 const MM = 0.001;
@@ -25,6 +25,10 @@ export function pointInPoly(x, y, poly) {
   }
   return inside;
 }
+
+// сторона помещения по направлению стены и тому, с какой стороны от неё комната:
+// N — у окон, S — к входу, W — левая, E — правая (по плану)
+const sideOf = (alongX, k) => (alongX ? (k > 0 ? 'N' : 'S') : (k > 0 ? 'W' : 'E'));
 
 function polyCentroid(poly) {
   let cx = 0, cy = 0, a = 0;
@@ -87,9 +91,11 @@ export class Building {
     this.opts = { ceiling: plan.M.ceiling, wallColor: '#f2efe9', laminate: 'oak-natural', plankSize: 'std', plankDir: 'y' };
     this.cutMm = null;
     this.flags = { ceiling: false, doors: true, swings: true };
-    this.finishOn = {};          // id отделки → показывать ли (по умолчанию да)
+    this.finishOn = {};          // вид отделки (wallpaper, brick, tile, apron) → показывать ли (по умолчанию да)
     this.finishTex = {};
     this.finishMats = {};
+    this.covers = {};            // покрытия стен из варианта: ключ стены → { id, c } (поверх отделки по плану)
+    this.userCovers = new Map(); // свои обои по фото: id → { id, name, w, canvas, avg }
   }
 
   get ceilingMm() { return this.opts.ceiling; }
@@ -123,8 +129,14 @@ export class Building {
     this.buildFloor();
     this.buildCeiling(ceil);
     this.buildRooms();
+    this.buildSurfaces();
     this.buildFinishes(ceil);
+    // подсветка стен строилась по старой геометрии (её уже убрали вместе с домом) — строим заново
+    const hl = this.hls || {};
+    this.hls = {};
+    for (const slot of Object.keys(hl)) this.highlightSurface(hl[slot].key, slot);
     this.buildBaseboards();
+    this.buildMoldings(ceil);
     this.buildPipes(ceil);
     this.buildRoomLights(ceil);
     this.setLaminate(this.opts.laminate, this.opts.plankSize);
@@ -388,36 +400,191 @@ export class Building {
     });
   }
 
-  // ── Отделка: тонкие панели с текстурой поверх покрашенных стен ──
-  buildFinishes(ceil) {
-    this.finishMeshes = {};
-    const aniso = this.renderer ? Math.min(8, this.renderer.capabilities.getMaxAnisotropy()) : 4;
-    for (const f of this.plan.FINISHES || []) {
-      const key = f.kind === 'wallpaper' ? `wallpaper-${f.pattern}` : f.kind;
-      const make = { brick: makeBrick, tile: makeTile, slab: makeSlab, 'wallpaper-linen': makeLinen, 'wallpaper-fern': makeFern }[key];
-      if (!make) continue;
-      if (!this.finishTex[key]) this.finishTex[key] = make(aniso);
-      const t = this.finishTex[key];
-      // размер одного повтора текстуры, мм: у кирпича высота ряда — потолок / число рядов; у обоев — ширина рулона
-      const size = f.kind === 'brick' ? [f.brick, ceil / f.courses] : f.kind === 'slab' ? f.slab : f.kind === 'wallpaper' ? f.repeat : f.tile;
-      const repW = t.cols * size[0], repH = t.rows * size[1];
-      const geo = this.finishGeometry(f, ceil, repW, repH);
-      if (!geo) continue;
-      if (!this.finishMats[f.id]) this.finishMats[f.id] = finishMaterial(t, f.kind, [this.cutPlane], f.color);
-      const mesh = new THREE.Mesh(geo, this.finishMats[f.id]);
-      mesh.receiveShadow = true;
-      mesh.visible = this.finishOn[f.id] !== false;
-      mesh.userData.finish = f.id;
-      this.group.add(mesh);
-      this.finishMeshes[f.id] = mesh;
+  // ── Стены комнат как отдельные поверхности: ключ «комната:номер стороны контура» ──
+  // По ним раскладывается отделка, их выбирают в инструменте «Обои».
+  buildSurfaces() {
+    this.surfaces = [];
+    const editable = this.plan.COVER_ROOMS || [];
+    for (const room of this.plan.ROOMS) {
+      const poly = room.poly;
+      for (let i = 0; i < poly.length; i++) {
+        const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length];
+        const alongX = Math.abs(by - ay) < 0.5;
+        if (!alongX && Math.abs(bx - ax) >= 0.5) continue;
+        const mx = (ax + bx) / 2, my = (ay + by) / 2;
+        const k = alongX ? (pointInPoly(mx, my + 5, poly) ? 1 : -1) : (pointInPoly(mx + 5, my, poly) ? 1 : -1);
+        const c = alongX ? ay : ax;
+        const s0 = alongX ? Math.min(ax, bx) : Math.min(ay, by), s1 = alongX ? Math.max(ax, bx) : Math.max(ay, by);
+        // окна и двери на этой стене — для подписи в карточке
+        const on = (p) => Math.abs((alongX ? (k > 0 ? p.y1 : p.y0) : (k > 0 ? p.x1 : p.x0)) - c) <= 1
+          && Math.min(s1, alongX ? p.x1 : p.y1) - Math.max(s0, alongX ? p.x0 : p.y0) > 1;
+        this.surfaces.push({
+          key: `${room.id}:${i}`, room: room.id, roomName: room.name, side: sideOf(alongX, k), alongX, k, c, s0, s1, len: s1 - s0,
+          win: this.pieces.some((p) => p.kind === 'sill' && p.h1 > 1 && on(p)), door: this.pieces.some((p) => p.kind === 'door' && on(p)),
+          editable: editable.includes(room.id),
+        });
+      }
     }
+  }
+  surface(key) { return this.surfaces.find((sf) => sf.key === key) || null; }
+
+  // покрытие стены по плану: первая отделка на всю стену, которая её касается; иначе — краска
+  planCover(sf) {
+    for (const f of this.plan.FINISHES || []) {
+      if (f.h || f.parts) continue;                                   // фартук и участки — отдельно
+      if (!f.rooms.includes(sf.room) || (f.sides && !f.sides.includes(sf.side))) continue;
+      return f.cover ? { id: f.cover } : { finish: f.id };
+    }
+    return { id: 'paint' };
+  }
+  // покрытие с учётом правок варианта
+  coverOf(sf) { return (sf.editable && this.covers[sf.key]) || this.planCover(sf); }
+
+  // как выглядит покрытие: ключ (по нему стены с одинаковым видом собираются в один меш), вид и размеры рисунка.
+  // null — панель не нужна (обычная покраска стен).
+  look(cv) {
+    if (!cv) return null;
+    if (cv.finish) {
+      const f = (this.plan.FINISHES || []).find((q) => q.id === cv.finish);
+      return f && { key: `f:${f.id}`, kind: f.kind, tile: f.tile, slab: f.slab, color: f.color || '#ffffff', cat: f.kind, f };
+    }
+    const base = (this.plan.COVERS || []).find((q) => q.id === cv.id);
+    if (base) {
+      if (base.kind === 'paint') return cv.c ? { key: `paint${cv.c}`, kind: 'paint', color: cv.c } : null;
+      const color = cv.c || base.color;
+      return { key: `${base.id}${color}`, kind: base.kind, pattern: base.pattern, color, repeat: base.repeat, courses: base.courses, brick: base.brick,
+        cat: base.kind === 'brick' ? 'brick' : 'wallpaper' };
+    }
+    const u = this.userCovers.get(cv.id);
+    if (u && u.canvas) return { key: `u:${u.id}:${u.w}`, kind: 'photo', photo: u, color: '#ffffff', repeat: [u.w, (u.w * u.canvas.height) / u.canvas.width], cat: 'wallpaper' };
+    // своё фото, которого на этом устройстве нет (пришло по ссылке), — его основной цвет
+    const c = cv.a || (u && u.avg);
+    return c ? { key: `paint${c}`, kind: 'paint', color: c } : null;
+  }
+
+  // текстура для вида отделки и размер всей картинки на стене, мм
+  texFor(lk) {
+    const key = lk.kind === 'wallpaper' ? `wallpaper-${lk.pattern}` : lk.kind === 'photo' ? `u:${lk.photo.id}` : lk.kind;
+    if (!this.finishTex[key]) {
+      const aniso = this.renderer ? Math.min(8, this.renderer.capabilities.getMaxAnisotropy()) : 4;
+      if (lk.kind === 'photo') this.finishTex[key] = photoTexture(lk.photo.canvas, aniso);
+      else {
+        const make = { brick: makeBrick, tile: makeTile, slab: makeSlab, 'wallpaper-linen': makeLinen, 'wallpaper-fern': makeFern,
+          'wallpaper-stripes': makeStripes, 'wallpaper-plaster': makePlaster }[key];
+        if (!make) return null;
+        this.finishTex[key] = make(aniso);
+      }
+    }
+    const t = this.finishTex[key], ceil = this.opts.ceiling;
+    // размер одного повтора, мм: у кирпича высота ряда — потолок / число рядов; у обоев — ширина рулона
+    const size = lk.kind === 'brick' ? [lk.brick, ceil / lk.courses] : lk.kind === 'slab' ? lk.slab : lk.kind === 'tile' ? lk.tile : lk.repeat;
+    return { t, repW: t.cols * size[0], repH: t.rows * size[1] };
+  }
+
+  // ── Отделка: тонкие панели с текстурой поверх покрашенных стен ──
+  // Сначала покрытия на всю стену (по стенам, с правками варианта), потом участки и полосы — фартук.
+  buildFinishes(ceil) {
+    if (this.finishGroup) {
+      this.group.remove(this.finishGroup);
+      this.finishGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+    }
+    this.finishGroup = new THREE.Group();
+    this.group.add(this.finishGroup);
+    this.finishMeshes = [];
+    const used = new Set();
+    const add = (f, lk) => {
+      const geo = lk.kind === 'paint' ? this.finishGeometry(f, ceil, 1000, 1000) : (() => {
+        const tx = this.texFor(lk);
+        return tx && this.finishGeometry(f, ceil, tx.repW, tx.repH);
+      })();
+      if (!geo) return;
+      if (!this.finishMats[lk.key]) {
+        this.finishMats[lk.key] = lk.kind === 'paint' ? paintMaterial(lk.color, [this.cutPlane])
+          : finishMaterial(this.texFor(lk).t, lk.kind === 'photo' ? 'wallpaper' : lk.kind, [this.cutPlane], lk.color);
+      }
+      used.add(lk.key);
+      const mesh = new THREE.Mesh(geo, this.finishMats[lk.key]);
+      mesh.receiveShadow = true;
+      mesh.userData.finish = lk.key; mesh.userData.cat = lk.cat || 'paint';
+      mesh.visible = this.finishOn[mesh.userData.cat] !== false;
+      this.finishGroup.add(mesh);
+      this.finishMeshes.push(mesh);
+    };
+    const groups = new Map();
+    for (const sf of this.surfaces) {
+      const lk = this.look(this.coverOf(sf));
+      if (!lk) continue;
+      let g = groups.get(lk.key);
+      if (!g) groups.set(lk.key, (g = { lk, rooms: new Set(), edges: new Set() }));
+      g.rooms.add(sf.room); g.edges.add(sf.key);
+    }
+    for (const { lk, rooms, edges } of groups.values()) add({ ...(lk.f || {}), id: lk.key, rooms: [...rooms], edges }, lk);
+    for (const f of this.plan.FINISHES || []) {
+      if (!f.h && !f.parts) continue;
+      add(f, { key: `f:${f.id}`, kind: f.kind, slab: f.slab, tile: f.tile, repeat: f.repeat, color: f.color || '#ffffff', cat: f.id === 'apron' ? 'apron' : f.kind });
+    }
+    // материалы видов, которых больше нет ни на одной стене, — освобождаем (кроме самых первых, их мало)
+    for (const k of Object.keys(this.finishMats)) if (!used.has(k) && /^(u:|paint|.*#)/.test(k)) { this.finishMats[k].dispose(); delete this.finishMats[k]; }
+  }
+
+  // сменить покрытия стен (правки варианта) — перестраивается только отделка
+  setCovers(covers) {
+    this.covers = covers || {};
+    if (this.surfaces) this.buildFinishes(this.opts.ceiling);
+  }
+  // свои обои по фото: добавить/обновить (canvas — картинка) или убрать
+  setUserCover(u) {
+    const old = this.userCovers.get(u.id);
+    if (old && old.canvas !== u.canvas && this.finishTex[`u:${u.id}`]) { this.finishTex[`u:${u.id}`].map.dispose(); delete this.finishTex[`u:${u.id}`]; }
+    this.userCovers.set(u.id, u);
+  }
+  removeUserCover(id) {
+    const t = this.finishTex[`u:${id}`];
+    if (t) { t.map.dispose(); delete this.finishTex[`u:${id}`]; }
+    this.userCovers.delete(id);
+  }
+
+  // стена под лучом: по точке и нормали попадания (пол, потолок и торцы стен не подходят)
+  surfaceAt(hit) {
+    if (!hit || !hit.face || !this.surfaces) return null;
+    const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+    if (Math.abs(n.y) > 0.5) return null;
+    const alongX = Math.abs(n.z) > Math.abs(n.x), k = Math.sign(alongX ? n.z : n.x);
+    const px = hit.point.x / MM, py = hit.point.z / MM, c = alongX ? py : px, t = alongX ? px : py;
+    let best = null, bd = 8;
+    for (const sf of this.surfaces) {
+      if (sf.alongX !== alongX || sf.k !== k || t < sf.s0 - 2 || t > sf.s1 + 2) continue;
+      const d = Math.abs(sf.c - c);
+      if (d < bd) { best = sf; bd = d; }
+    }
+    return best;
+  }
+
+  // подсветка стены: slot 'sel' — выбранная (ярче), 'hover' — под мышью; key = null — убрать
+  highlightSurface(key, slot = 'sel') {
+    this.hls = this.hls || {};
+    const old = this.hls[slot];
+    if (old && old.key === key && old.mesh.parent) return;
+    if (old) { this.group.remove(old.mesh); old.mesh.geometry.dispose(); delete this.hls[slot]; }
+    const sf = key && this.surfaces && this.surface(key);
+    if (!sf) return;
+    if (!this.mat.hl) {
+      const mk = (opacity) => Object.assign(new THREE.MeshBasicMaterial({ color: '#2b45c8', transparent: true, opacity, depthWrite: false }), { clippingPlanes: [this.cutPlane] });
+      this.mat.hl = { sel: mk(0.2), hover: mk(0.08) };
+    }
+    const geo = this.finishGeometry({ id: 'hl', rooms: [sf.room], edges: new Set([key]), off: slot === 'sel' ? 4 : 5 }, this.opts.ceiling, 1000, 1000);
+    if (!geo) return;
+    const mesh = new THREE.Mesh(geo, this.mat.hl[slot]);
+    mesh.renderOrder = 2;
+    this.group.add(mesh);
+    this.hls[slot] = { key, mesh };
   }
 
   // Для каждой стороны помещения берём куски стен и коробов, чья грань лежит на этой стороне,
   // и кладём поверх панель того же размера — проёмы дверей остаются открытыми сами собой.
   finishGeometry(f, ceil, repW, repH) {
     const P = [], Nr = [], U = [], I = [];
-    const OFF = 1.5;    // мм от стены, чтобы панель не мерцала
+    const OFF = f.off || (f.h ? 3 : 1.5);    // мм от стены, чтобы панель не мерцала; полосы (фартук) — поверх обоев
     const [band0, band1] = f.h || [0, ceil];          // полоса по высоте (фартук) или вся стена
     let ox = 0, oy = 0; // начало раскладки — угол помещения или начало участка (offset)
     const uvOf = (n) => (p) => (n[1] !== 0 ? [(p[0] - ox) / repW, (p[2] - oy) / repH]
@@ -436,8 +603,6 @@ export class Building {
       ? quad([[a, h0, c], [b, h0, c], [b, h1, c], [a, h1, c]], [0, 0, k])
       : quad([[c, h0, a], [c, h0, b], [c, h1, b], [c, h1, a]], [k, 0, 0]));
     const hquad = (x0, x1, y0, y1, h, k) => quad([[x0, h, y0], [x1, h, y0], [x1, h, y1], [x0, h, y1]], [0, k, 0]);
-    const sideOf = (alongX, k) => (alongX ? (k > 0 ? 'N' : 'S') : (k > 0 ? 'W' : 'E'));
-
     for (const roomId of f.rooms) {
       const room = this.plan.ROOMS.find((r) => r.id === roomId);
       if (!room) continue;
@@ -451,6 +616,7 @@ export class Building {
         const k = alongX ? (pointInPoly(mx, my + 5, poly) ? 1 : -1) : (pointInPoly(mx + 5, my, poly) ? 1 : -1);
         const side = sideOf(alongX, k);
         if (f.sides && !f.sides.includes(side)) continue;
+        if (f.edges && !f.edges.has(`${roomId}:${i}`)) continue;
         // участки стены: вся сторона или несколько отрезков (parts) — например, обои двух видов на одной стене
         for (const part of f.parts ? f.parts.filter((q) => q.side === side) : [{}]) {
         ox = rx; oy = ry;
@@ -477,6 +643,10 @@ export class Building {
         if (!pointInPoly(n.horiz ? mid : out, n.horiz ? out : mid, poly)) continue;
         if (f.sides && !f.sides.includes(sideOf(n.horiz, -n.dir))) continue;
         if (f.parts || f.h) continue;                     // ниши — только у отделки на всю стену
+        if (f.edges) {                                    // ниша — часть той стены, в которой вырезана
+          const sf = this.surfaces.find((q) => q.room === roomId && q.alongX === n.horiz && Math.abs(q.c - n.face) <= 1 && mid >= q.s0 && mid <= q.s1);
+          if (!sf || !f.edges.has(sf.key)) continue;
+        }
         const [r0, r1] = [Math.min(n.face, n.back), Math.max(n.face, n.back)];
         const A = n.horiz;
         vquad(A, n.back - n.dir * OFF, n.from, n.to, n.bottom, n.top, -n.dir);
@@ -614,14 +784,37 @@ export class Building {
     this.baseboard = mesh;
   }
 
+  // ── Молдинги: планка с чуть скруглёнными передними краями, от пола до потолка ──
+  buildMoldings(ceil) {
+    for (const m of this.plan.MOLDINGS || []) {
+      const w = m.w * MM, t = m.t * MM, r = Math.min(t * 0.5, w * 0.2), h = ((m.h1 ?? ceil) - (m.h0 || 0)) * MM;
+      const sh = new THREE.Shape();                    // профиль: x — вдоль стены, y — от стены
+      sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.lineTo(w / 2, t - r); sh.quadraticCurveTo(w / 2, t, w / 2 - r, t);
+      sh.lineTo(-w / 2 + r, t); sh.quadraticCurveTo(-w / 2, t, -w / 2, t - r); sh.closePath();
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: h, bevelEnabled: false, curveSegments: 5 });
+      geo.rotateX(-Math.PI / 2);                       // выдавливание — вверх, «от стены» — по −Z
+      if (!this.mat.molding) {
+        this.mat.molding = new THREE.MeshStandardMaterial({ color: m.color || '#f7f7f5', roughness: 0.4 });
+        this.mat.molding.clippingPlanes = [this.cutPlane];
+      }
+      const mesh = new THREE.Mesh(geo, this.mat.molding);
+      mesh.rotation.y = m.alongX ? (m.k > 0 ? Math.PI : 0) : (m.k > 0 ? -Math.PI / 2 : Math.PI / 2);
+      mesh.position.set(m.x * MM, (m.h0 || 0) * MM, m.y * MM);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.userData.arch = m.name;
+      this.group.add(mesh);
+    }
+  }
+
   setBaseboard(on) {
     this.baseboardOn = on;
     if (this.baseboard) this.baseboard.visible = on;
   }
 
-  setFinish(id, on) {
-    this.finishOn[id] = on;
-    if (this.finishMeshes && this.finishMeshes[id]) this.finishMeshes[id].visible = on;
+  // показать/скрыть вид отделки: wallpaper, brick, tile, apron
+  setFinish(cat, on) {
+    this.finishOn[cat] = on;
+    for (const m of this.finishMeshes || []) if (m.userData.cat === cat) m.visible = on;
   }
 
   buildRoomLights(ceil) {

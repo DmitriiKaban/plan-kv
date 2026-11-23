@@ -37,14 +37,45 @@ export function cleanItems(list) {
   });
 }
 
+// покрытия стен в варианте: ключ стены «комната:номер» → { id — покрытие, c — свой оттенок,
+// a и n — основной цвет и название своего фото (для другого устройства, где самого фото нет) }
+const WALL_KEY = /^[a-z]{2,20}:\d{1,2}$/, COVER_ID = /^[\w-]{1,40}$/;
+export function cleanWalls(obj) {
+  const out = {};
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
+  for (const [k, v] of Object.entries(obj).slice(0, 300)) {
+    if (!WALL_KEY.test(k) || !v || typeof v !== 'object' || !COVER_ID.test(v.id || '')) continue;
+    const o = { id: v.id };
+    if (HEX.test(v.c || '')) o.c = v.c.toLowerCase();
+    if (HEX.test(v.a || '')) o.a = v.a.toLowerCase();
+    if (typeof v.n === 'string' && v.n.trim()) o.n = v.n.trim().slice(0, 40);
+    out[k] = o;
+  }
+  return out;
+}
+// свои обои по фото: { id, name, w — ширина картинки на стене, мм, avg — основной цвет }; в файле ещё img (data URL)
+export function cleanUserCovers(list, withImg = false) {
+  if (!Array.isArray(list)) return [];
+  return list.filter((u) => u && /^u[\w-]{1,24}$/.test(u.id || '')).slice(0, 60).map((u) => {
+    const o = { id: u.id, name: String(u.name || 'Своё фото').slice(0, 40), w: Math.min(5000, Math.max(50, Math.round(+u.w) || 530)),
+      avg: HEX.test(u.avg || '') ? u.avg.toLowerCase() : '#dddddd' };
+    if (withImg && typeof u.img === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(u.img)) o.img = u.img;
+    return o;
+  });
+}
+// картинки своих обоев лежат отдельно от расстановки — она сохраняется часто, а фото большие
+const IMG = 'apartment3d.wp.';
+export function saveCoverImage(id, dataUrl) { try { localStorage.setItem(IMG + id, dataUrl); return true; } catch (e) { return false; } }
+export function loadCoverImage(id) { try { return localStorage.getItem(IMG + id); } catch (e) { return null; } }
+export function removeCoverImage(id) { try { localStorage.removeItem(IMG + id); } catch (e) { /* нет доступа */ } }
+
 export function parseLayoutText(text) {
   const data = JSON.parse(text);
-  if (Array.isArray(data)) return { name: 'Импорт', items: cleanItems(data) };
-  if (data && Array.isArray(data.items)) return { name: String(data.name || 'Импорт').slice(0, 40), items: cleanItems(data.items) };
-  if (data && Array.isArray(data.layouts)) {
-    const cur = data.layouts.find((l) => l.id === data.current) || data.layouts[0];
-    return { name: String(cur?.name || 'Импорт').slice(0, 40), items: cleanItems(cur?.items) };
-  }
+  if (Array.isArray(data)) return { name: 'Импорт', items: cleanItems(data), walls: {}, wallpapers: [] };
+  const one = (l, d) => ({ name: String(l?.name || 'Импорт').slice(0, 40), items: cleanItems(l?.items), walls: cleanWalls(l?.walls),
+    wallpapers: cleanUserCovers(d?.wallpapers, true) });
+  if (data && Array.isArray(data.items)) return one(data, data);
+  if (data && Array.isArray(data.layouts)) return one(data.layouts.find((l) => l.id === data.current) || data.layouts[0], data);
   throw new Error('Не похоже на файл расстановки');
 }
 
@@ -75,14 +106,14 @@ async function pipe(bytes, stream) {
   return new Uint8Array(res);
 }
 
-// компактная форма: массив массивов вместо объектов
-const pack = (layout) => ({ n: layout.name, i: layout.items.map((it) => {
+// компактная форма: массив массивов вместо объектов; w — покрытия стен (если меняли)
+const pack = (layout) => ({ n: layout.name, ...(layout.walls && Object.keys(layout.walls).length ? { w: layout.walls } : {}), i: layout.items.map((it) => {
   const a = [it.type, it.name, it.w, it.d, it.h, it.z || 0, Math.round(it.x), Math.round(it.y), it.rot || 0, it.color];
   if (it.color2 || it.handles === false || it.metal || it.set || it.hob) a.push(it.color2 || 0, it.handles === false ? 0 : 1, it.metal || 0, it.set || 0);
   if (it.hob) a.push(it.hob, it.burners || 0);
   return a;
 }) });
-const unpack = (p) => ({ name: p.n || 'Из ссылки', items: cleanItems((p.i || []).map((a) => ({
+const unpack = (p) => ({ name: p.n || 'Из ссылки', walls: cleanWalls(p.w), items: cleanItems((p.i || []).map((a) => ({
   type: a[0], name: a[1], w: a[2], d: a[3], h: a[4], z: a[5], x: a[6], y: a[7], rot: a[8], color: a[9],
   ...(a.length > 10 ? { color2: a[10] || undefined, handles: a[11] === 0 ? false : undefined, metal: a[12] || undefined, set: a[13] || undefined } : {}),
   ...(a.length > 14 ? { hob: a[14] || undefined, burners: a[15] || undefined } : {}),

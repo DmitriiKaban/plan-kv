@@ -149,7 +149,8 @@ export const WALLS = [
   ] },
   { id: 'balcony', name: 'Балкон | гостиная', x0: X.liv0, y0: Y.bal1, x1: X.liv1, y1: Y.liv0, openings: [
     { type: 'window', from: balWin0, to: balWin1, bottom: H.winBottom, top: H.balTop, sill: 1 },
-    door(balWin1, balWin1 + M.balDoorW, 'from', -1, { top: H.balTop, name: 'Балконная дверь', acc: 'балконную дверь', glass: true }),
+    // балконная дверь открывается на балкон, вправо (если смотреть из гостиной): петли справа
+    door(balWin1, balWin1 + M.balDoorW, 'to', -1, { top: H.balTop, name: 'Балконная дверь', acc: 'балконную дверь', glass: true }),
   ] },
   { id: 'bedKitchen', name: 'Спальня | кухня', x0: X.bed1, y0: Y.top, x1: X.kit0, y1: Y.hall0, openings: [] },
   { id: 'bedHall', name: 'Спальня | прихожая', x0: X.bed0, y0: Y.bed1, x1: X.bed1, y1: Y.hall0, openings: [
@@ -205,35 +206,52 @@ export const ROOMS = [
   { id: 'balcony', name: 'Балкон', poly: rect(X.liv0, Y.top, X.liv1, Y.bal1), outdoor: true },
 ];
 
-// две полосы обоев по 53 см напротив кровати (кровать стоит посередине спальни по длине)
-const BED_ACCENT = [M.bedD / 2 - 530, M.bedD / 2 + 530];
+// ── Покрытия стен: из них выбирают в карточке стены (инструмент «Обои» — валик слева) ──
+// kind: wallpaper — обои (pattern — рисунок, repeat — размер повтора, мм), brick — кирпичик, paint — покраска.
+// color — оттенок (умножается на рисунок), в карточке его можно поменять. Обои Natural Forest — рулон 53 см, по фото.
+export const COVERS = [
+  { id: 'nf1009', name: 'NF1009', note: 'бежевый лён', kind: 'wallpaper', pattern: 'linen', color: '#ebe5d8', repeat: [530, 530] },
+  { id: 'nf1007', name: 'NF1007', note: 'светлый лён', kind: 'wallpaper', pattern: 'linen', color: '#fffcf5', repeat: [530, 530] },
+  { id: 'nf3207', name: 'NF3207', note: 'папоротники', kind: 'wallpaper', pattern: 'fern', color: '#fcf7ec', repeat: [530, 640] },
+  { id: 'linen-white', name: 'Белый лён', note: 'как NF1007, только белые', kind: 'wallpaper', pattern: 'linen', color: '#fffffc', repeat: [530, 530] },
+  { id: 'stripes', name: 'Полоска', note: 'полосы по 8,8 см', kind: 'wallpaper', pattern: 'stripes', color: '#efe9df', repeat: [530, 530] },
+  { id: 'plaster', name: 'Под бетон', note: 'декоративная штукатурка', kind: 'wallpaper', pattern: 'plaster', color: '#e8e5e0', repeat: [1200, 1200] },
+  { id: 'brick', name: 'Кирпичик', note: 'белый, как на кухне', kind: 'brick', color: '#ffffff', courses: 39, brick: 246 },
+  { id: 'paint', name: 'Краска', note: 'без обоев', kind: 'paint' },
+];
+// где стены можно менять: в ванной и туалете плитка — её не трогаем
+export const COVER_ROOMS = ['living', 'bedroom', 'kitchen', 'hall', 'corridor', 'balcony'];
 
-// ── Отделка стен поверх покраски ──
+// ── Отделка стен поверх покраски (как сделано сейчас; в варианте её можно поменять на любой стене) ──
 // rooms — помещения; sides — какие стены: N — у окон, S — к входу, W — левая, E — правая (по плану).
-// Без sides — все стены помещения, включая короба и ниши.
+// Без sides — все стены помещения, включая короба и ниши. cover — покрытие из COVERS.
 // parts — вместо sides, если отделка занимает часть стены: { side, from, to, offset } (мм вдоль стены,
 // offset — где начинается первая плитка); h — полоса по высоте [от, до]. Фартук кухни добавляется из kitchen.js.
 export const FINISHES = [
   // кухня: стена напротив гарнитура (к спальне) в белом кирпичике, 39 рядов от пола до потолка,
   // кирпич ≈ 24,6 см по длине (по фото)
-  { id: 'brick', kind: 'brick', name: 'Белый кирпичик', rooms: ['kitchen'], sides: ['W'], courses: 39, brick: 246 },
+  { id: 'brick', cover: 'brick', rooms: ['kitchen'], sides: ['W'] },
   // ванная и туалет: плитка 60 × 30, шов в шов
   { id: 'tile', kind: 'tile', name: 'Плитка 60×30', rooms: ['bath', 'toilet'], tile: [600, 300] },
-
-  // обои Natural Forest, рулон 53 см (по фото); repeat — размер повтора рисунка, мм
-  { id: 'wp-hall', kind: 'wallpaper', pattern: 'linen', name: 'Обои NF1009', color: '#ebe5d8', repeat: [530, 530], rooms: ['hall', 'corridor'] },
-  { id: 'wp-bed', kind: 'wallpaper', pattern: 'linen', name: 'Обои NF1007', color: '#fffcf5', repeat: [530, 530], rooms: ['bedroom'],
-    parts: [{ side: 'N' }, { side: 'S' }, { side: 'E' }, { side: 'W', to: BED_ACCENT[0] }, { side: 'W', from: BED_ACCENT[1] }] },
-  // спальня: две полосы с папоротниками на стене напротив кровати, по центру кровати
-  { id: 'wp-bed-accent', kind: 'wallpaper', pattern: 'fern', name: 'Обои NF3207', color: '#fcf7ec', repeat: [530, 640], rooms: ['bedroom'],
-    parts: [{ side: 'W', from: BED_ACCENT[0], to: BED_ACCENT[1], offset: BED_ACCENT[0] }] },
-  // гостиная: как NF1007, только белые
-  { id: 'wp-living', kind: 'wallpaper', pattern: 'linen', name: 'Обои белые', color: '#fffffc', repeat: [530, 530], rooms: ['living'] },
+  // обои: прихожая и коридор — NF1009, спальня — NF1007, а стена напротив кровати целиком в папоротниках NF3207,
+  // гостиная — как NF1007, только белые
+  { id: 'wp-hall', cover: 'nf1009', rooms: ['hall', 'corridor'] },
+  { id: 'wp-bed', cover: 'nf1007', rooms: ['bedroom'], sides: ['N', 'S', 'E'] },
+  { id: 'wp-bed-accent', cover: 'nf3207', rooms: ['bedroom'], sides: ['W'] },
+  { id: 'wp-living', cover: 'linen-white', rooms: ['living'] },
 ];
 
 // ── Плинтус: белый, 10 см, во всех комнатах, кроме кухни, ванной и туалета (и балкона) ──
 // t — толщина, мм; у дверей обрывается у наличников
 export const BASEBOARD = { h: 100, t: 15, color: '#f7f7f5', rooms: ['living', 'bedroom', 'hall', 'corridor'] };
+
+// ── Молдинги: вертикальные белые планки на стыках отделки ──
+// x, y — точка стыка на стене (мм), alongX — стена идёт вдоль X, k — в какую сторону от стены комната,
+// w — ширина планки, t — насколько выступает от стены
+export const MOLDINGS = [
+  // левая стена: кирпичик на кухне переходит в обои коридорчика — стык закрывает молдинг 5 см от пола до потолка
+  { name: 'Молдинг 5 см', x: X.kit0, y: Y.kit1, alongX: false, k: 1, w: 50, t: 15, color: '#f7f7f5' },
+];
 
 // Внешний контур (по наружным граням стен) — по нему строятся пол и потолок
 export const OUTLINE = [
@@ -244,4 +262,4 @@ export const OUTLINE = [
 // yaw — поворот взгляда в радианах (0 — к окнам, плюс — вправо)
 export const START = { x: X.liv1 - 700, y: Y.liv1 - 600, yaw: -0.2 };
 
-export const PLAN = { M, T, H, WALLS, FIXTURES, ROOMS, FINISHES, BASEBOARD, RAD, HEATING, OUTLINE, START, COORDS };
+export const PLAN = { M, T, H, WALLS, FIXTURES, ROOMS, FINISHES, COVERS, COVER_ROOMS, BASEBOARD, MOLDINGS, RAD, HEATING, OUTLINE, START, COORDS };

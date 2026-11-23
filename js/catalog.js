@@ -40,6 +40,8 @@ export const CATALOG = [
     { type: 'deskLift', name: 'Стол с электроподъёмом 140', w: 1400, d: 700, h: 750, color: '#b5814f' },
     { type: 'monitorCurved', name: 'Монитор AOC 34″ изогнутый', w: 808, d: 250, h: 480, z: 750, color: '#1b1c1e' },
     { type: 'chair', name: 'Стул', w: 450, d: 520, h: 900, color: '#55585c' },
+    { type: 'chairOffice', name: 'Кресло с подголовником', w: 660, d: 660, h: 1250, color: '#1d1e20' },
+    { type: 'chairOffice', name: 'Компьютерный стул', w: 620, d: 600, h: 1000, color: '#1d1e20' },
     { type: 'drawerUnit', name: 'Тумба с 3 ящиками', w: 500, d: 600, h: 820, color: '#f1f1ee' },
     { type: 'windowTop', name: 'Столешница с решёткой над батареей', w: 2400, d: 600, h: 30, z: 820, color: '#cfb38e' },
     { type: 'drawerApron', name: 'Ящики под столешницу', w: 1400, d: 450, h: 120, z: 700, color: '#f1f1ee' },
@@ -64,8 +66,10 @@ export const CATALOG = [
     { type: 'diningTable', name: 'Обеденный стол', w: 1100, d: 700, h: 750, color: '#b08d68' },
     { type: 'roundTable', name: 'Круглый стол', w: 900, d: 900, h: 750, color: '#b08d68' },
     { type: 'tableSquare', name: 'Стол 80×80', w: 800, d: 800, h: 750, color: '#a27c58' },
-    { type: 'sconceBalls', name: 'Бра с шариками', w: 130, d: 200, h: 800, z: 1000, color: '#b8955a' },
+    { type: 'sconceBalls', name: 'Бра с шариками', w: 100, d: 160, h: 400, z: 1200, color: '#b8955a' },
     { type: 'chair', name: 'Стул', w: 450, d: 520, h: 900, color: '#55585c' },
+    { type: 'kettleGlass', name: 'Чайник Xiaomi стеклянный', w: 221, d: 142, h: 243, z: 910, color: '#c3c7cb' },
+    { type: 'microwave', name: 'Микроволновка Samsung 20 л', w: 440, d: 338, h: 259, z: 910, color: '#f4f4f2' },
   ] },
   { group: 'Ванная и туалет', items: [
     { type: 'bathtub', name: 'Ванна 140×70', w: 1400, d: 700, h: 560, color: '#f6f6f4' },
@@ -75,7 +79,7 @@ export const CATALOG = [
     { type: 'dryer', name: 'Электросушка', w: 560, d: 110, h: 520, z: 1620, color: '#cfd2d5' },
     { type: 'washer', name: 'Стиральная машина', w: 600, d: 450, h: 850, color: '#f1f2f3' },
     { type: 'toilet', name: 'Унитаз', w: 380, d: 650, h: 780, color: '#f6f6f4' },
-    { type: 'boiler', name: 'Бойлер 80 л', w: 450, d: 450, h: 800, z: 1300, color: '#f2f2f0' },
+    { type: 'boiler', name: 'Бойлер ⌀38,5 × 77', w: 385, d: 385, h: 770, z: 1450, color: '#f4f4f2' },
   ] },
   { group: 'Прихожая и прочее', items: [
     { type: 'wardrobe', name: 'Шкаф в прихожую', w: 1000, d: 400, h: 2200, color: '#ebe7e0' },
@@ -99,6 +103,7 @@ export const SHAPES = [
   ['tvUnit', 'ТВ-тумба с нишей'], ['shelfOpen', 'Открытые полки'], ['cabinetTall', 'Шкаф с ручками-кнопками'],
   ['drawerUnit', 'Тумба с ящиками'], ['shelfOpenR', 'Полки, открытые справа'], ['shelfOpenL', 'Полки, открытые слева'], ['windowTop', 'Столешница у окна'], ['drawerApron', 'Ящики под столешницу'], ['shelfFramed', 'Полки в раме'], ['cabinetDoor', 'Шкаф с дверцей'],
   ['shelfDivider', 'Стеллаж-перегородка'], ['slatPanel', 'Реечная панель'], ['soundbar', 'Саундбар'], ['turntable', 'Проигрыватель винила'], ['monitorCurved', 'Монитор изогнутый'],
+  ['chairOffice', 'Офисное кресло'], ['kettleGlass', 'Чайник'], ['microwave', 'Микроволновка'],
 ];
 
 export const SWATCHES = ['#ebe7e0', '#f4ede3', '#a6c6b9', '#d9cfc2', '#b08d68', '#7a5a3f', '#8b9098', '#4f5560', '#2d2e30', '#9db2c6', '#5f7a8c', '#a3ae97', '#c98f7a', '#e2c36f'];
@@ -146,6 +151,9 @@ const ICON = {
   washer: '<rect x="9" y="11" width="26" height="22"/><circle cx="22" cy="22" r="7"/>',
   toilet: '<rect x="14" y="5" width="16" height="9" rx="1"/><ellipse cx="22" cy="26" rx="7" ry="11"/>',
   boiler: '<circle cx="22" cy="22" r="12"/><path d="M22 14v16"/>',
+  chairOffice: '<rect x="14" y="16" width="16" height="15" rx="4"/><path d="M13 13q9-5 18 0M11 18v10M33 18v10"/>',
+  kettleGlass: '<circle cx="20" cy="22" r="9"/><path d="M29 18h5v8h-5M11 22H7"/>',
+  microwave: '<rect x="7" y="13" width="30" height="18" rx="1.5"/><path d="M29 13v18"/><circle cx="33" cy="18" r="1.4"/><circle cx="33" cy="26" r="1.4"/>',
   radiator: '<rect x="6" y="18" width="32" height="8"/><path d="M11 18v8M16 18v8M21 18v8M26 18v8M31 18v8"/>',
   box: '<rect x="8" y="10" width="28" height="24"/><path d="M8 10l28 24M36 10 8 34"/>',
   tableSquare: '<rect x="9" y="9" width="26" height="26" rx="1"/><path d="M12 12h3v3h-3zM29 12h3v3h-3zM12 29h3v3h-3zM29 29h3v3h-3z"/>',
@@ -574,27 +582,29 @@ const BUILD = {
 
   sconceBalls(g, W, D, H, c) {
     // бра по фото: латунная круглая накладка с коротким кронштейном, чёрный провод, латунная трубка
-    // и четыре матовых белых шара, между шарами тонкие латунные кольца. Цвет предмета — цвет латуни
+    // и четыре матовых белых шара, между шарами тонкие латунные кольца. Шары подбираются под длину бра
+    // (высота предмета): при 40 см — около 7 см, при 80 — 12. Цвет предмета — цвет латуни
     const brass = mat(c, 0.35, 0.75), black = mat('#18191b', 0.6);
     const glass = mat('#fbfaf6', 0.45, 0, { emissive: '#fff0d4', emissiveIntensity: 0.3 });
-    const z0 = -D / 2, top = H - 0.06, zc = z0 + Math.max(0.07, Math.min(0.13, D - 0.065));
-    const plate = C(g, 0.05, 0.05, 0.022, 0, top, z0 + 0.011, brass, 28); plate.rotation.x = Math.PI / 2;
-    const armL = zc - (z0 + 0.022) + 0.01;
-    const arm = C(g, 0.008, 0.008, armL, 0, top, z0 + 0.022 + armL / 2, brass, 12); arm.rotation.x = Math.PI / 2;
-    const r = Math.min(0.06, W / 2), fin = 0.018;
-    C(g, 0.006, 0.012, fin, 0, fin / 2, zc, brass, 10);                  // наконечник снизу
+    const pr = Math.max(0.03, Math.min(0.05, H * 0.09));               // радиус накладки
+    const z0 = -D / 2, top = H - pr - 0.005, zc = z0 + Math.max(0.06, Math.min(0.13, D - 0.06));
+    const plate = C(g, pr, pr, 0.02, 0, top, z0 + 0.01, brass, 28); plate.rotation.x = Math.PI / 2;
+    const armL = zc - (z0 + 0.02) + 0.008;
+    const arm = C(g, 0.007, 0.007, armL, 0, top, z0 + 0.02 + armL / 2, brass, 12); arm.rotation.x = Math.PI / 2;
+    const fin = 0.012, tubeH = Math.min(0.06, H * 0.09);
+    const r = Math.max(0.015, Math.min(W / 2, 0.06, (top - fin - tubeH - 0.02 - 0.012) / 8));
+    C(g, 0.005, 0.01, fin, 0, fin / 2, zc, brass, 10);                  // наконечник снизу
     let y = fin;
     for (let i = 0; i < 4; i++) {
       const ball = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), glass);
       ball.position.set(0, y + r, zc); ball.castShadow = true;
       g.add(ball);
       y += 2 * r + 0.004;
-      if (i < 3) C(g, r * 0.42, r * 0.42, 0.008, 0, y - 0.002, zc, brass, 20);   // кольцо в перехвате
+      if (i < 3) C(g, r * 0.42, r * 0.42, 0.007, 0, y - 0.002, zc, brass, 20);   // кольцо в перехвате
     }
-    const tubeH = 0.06;
-    C(g, 0.006, 0.006, tubeH, 0, y + tubeH / 2, zc, brass, 10);
+    C(g, 0.005, 0.005, tubeH, 0, y + tubeH / 2, zc, brass, 10);
     const cordH = top - (y + tubeH);
-    if (cordH > 0.005) C(g, 0.0025, 0.0025, cordH, 0, y + tubeH + cordH / 2, zc, black, 8);
+    if (cordH > 0.005) C(g, 0.0022, 0.0022, cordH, 0, y + tubeH + cordH / 2, zc, black, 8);
   },
 
   sconceDrum(g, W, D, H, c) {
@@ -1166,8 +1176,122 @@ const BUILD = {
     bowl.scale.z = (D - tankD) / W;
   },
   boiler(g, W, D, H, c) {
-    const b = C(g, W / 2, W / 2, H, 0, H / 2, 0, mat(c, 0.35), 32);
-    b.scale.z = D / W;
+    // бойлер по фото: белый цилиндр с приплюснутым верхом, снизу светлая крышка-конус с голубым огоньком
+    // и патрубками, спереди круглый термометр. Ставится задней стороной к стене
+    const white = mat(c, 0.3), grey = mat('#dfe1e2', 0.4), steel = mat('#b9bdc1', 0.3, 0.8);
+    const r = Math.min(W, D) / 2, capT = Math.min(0.05, H * 0.07), capB = Math.min(0.1, H * 0.13);
+    const bodyH = H - capT - capB;
+    C(g, r, r, bodyH, 0, capB + bodyH / 2, 0, white, 48);
+    const top = new THREE.Mesh(new THREE.SphereGeometry(r, 48, 10, 0, Math.PI * 2, 0, Math.PI / 2), white);
+    top.scale.y = capT / r; top.position.y = H - capT; top.castShadow = true;
+    g.add(top);
+    C(g, r * 0.985, r * 0.5, capB * 0.8, 0, capB * 0.2 + capB * 0.4, 0, grey, 40);          // нижняя крышка
+    const led = C(g, 0.014, 0.014, 0.004, 0, capB * 0.52, r * 0.76, mat('#4fb6ff', 0.3, 0, { emissive: '#3aa8ff', emissiveIntensity: 1.2 }), 16);
+    led.rotation.x = Math.PI / 2 - 0.55;
+    C(g, 0.034, 0.03, capB * 0.25, 0, capB * 0.12, 0.01, grey, 20);                         // ручка регулятора снизу
+    for (const sx of [-1, 1]) C(g, 0.01, 0.01, capB * 0.3, sx * 0.055, capB * 0.12, -0.02, steel, 10);   // патрубки
+    // термометр: серое кольцо, белая шкала, красная стрелка
+    const ty = capB + bodyH * 0.84;
+    const ring = C(g, 0.046, 0.046, 0.012, 0, ty, r - 0.002, grey, 32); ring.rotation.x = Math.PI / 2;
+    const face = C(g, 0.038, 0.038, 0.004, 0, ty, r + 0.006, mat('#fbfbfa', 0.4), 32); face.rotation.x = Math.PI / 2;
+    const needle = B(g, 0.004, 0.05, 0.002, 0, ty, r + 0.0095, mat('#d23a2a', 0.5), false);
+    needle.rotation.z = 0.6;
+  },
+  // офисное кресло по фото: пятилучевая крестовина на роликах, газлифт, сиденье, изогнутая сетчатая спинка,
+  // подлокотники на стойках. Выше 1,1 м — подголовник и поясничный упор (первое фото), иначе спинка ниже (второе)
+  chairOffice(g, W, D, H, c) {
+    const frame = mat('#151617', 0.45, 0.15), soft = mat(c, 0.92);
+    const meshM = mat(c, 0.85, 0, { side: THREE.DoubleSide, transparent: true, opacity: 0.86 });   // сетка спинки чуть просвечивает
+    const head = H > 1.1, R = Math.min(W, D) / 2 - 0.035;
+    const seatTop = Math.min(0.49, H * 0.5), sw = Math.min(0.52, W * 0.78), sd = Math.min(0.5, D * 0.8);
+    for (let i = 0; i < 5; i++) {                                          // крестовина и ролики
+      const a = Math.PI / 2 + (i / 5) * Math.PI * 2, cx = Math.cos(a), cz = Math.sin(a);
+      const spoke = B(g, R, 0.03, 0.042, (cx * R) / 2, 0.088, (cz * R) / 2, frame);
+      spoke.rotation.y = -a;
+      B(g, 0.022, 0.045, 0.022, cx * R, 0.06, cz * R, frame);
+      const wheel = C(g, 0.026, 0.026, 0.038, cx * R, 0.026, cz * R, frame, 16);
+      wheel.rotation.x = Math.PI / 2; wheel.rotation.z = a;
+    }
+    C(g, 0.045, 0.05, 0.06, 0, 0.088, 0, frame, 20);
+    C(g, 0.03, 0.036, 0.16, 0, 0.19, 0, frame, 20);                        // кожух газлифта
+    C(g, 0.022, 0.022, seatTop - 0.33, 0, 0.27 + (seatTop - 0.33) / 2, 0, mat('#9a9ea3', 0.3, 0.8), 16);
+    B(g, 0.22, 0.045, 0.24, 0, seatTop - 0.1, 0, frame);                   // механизм под сиденьем
+    softSlab(g, sw, sd, 0.075, 0, seatTop - 0.075, 0.02, 0.06, 0.018, soft);
+    // спинка: дуга радиусом 0,55 м, слегка откинута назад; рамка по краям
+    const bw = Math.min(0.48, W * 0.74), Rb = 0.55, half = bw / 2 / Rb;
+    const b0 = seatTop + 0.06, b1 = head ? H - 0.2 : H, bh = b1 - b0, zb = -sd / 2 + 0.01;
+    const bk = new THREE.Group();
+    bk.position.set(0, b0, zb); bk.rotation.x = -0.13;
+    g.add(bk);
+    const arc = (r, h, y, th, m) => {
+      const mm = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 24, 1, true, Math.PI - th, 2 * th), m);
+      mm.position.set(0, y, r); mm.castShadow = true; mm.receiveShadow = true;
+      bk.add(mm);
+      return mm;
+    };
+    arc(Rb, bh - 0.04, bh / 2, half, meshM);
+    arc(Rb + 0.004, 0.03, bh - 0.015, half + 0.01, frame);                // верх рамки
+    arc(Rb + 0.004, 0.03, 0.015, half * 0.85, frame);                     // низ рамки
+    for (const sx of [-1, 1]) {                                           // боковины рамки
+      const x = sx * Rb * Math.sin(half), z = Rb - Rb * Math.cos(half);
+      const side = new THREE.Mesh(new THREE.BoxGeometry(0.022, bh, 0.024), frame);
+      side.position.set(x, bh / 2, z); side.castShadow = true;
+      bk.add(side);
+    }
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.07, bh * 0.55 + 0.1, 0.03), frame);   // стойка спинки сзади
+    spine.position.set(0, bh * 0.27 - 0.05, -0.03); spine.castShadow = true;
+    bk.add(spine);
+    if (head) {
+      arc(Rb - 0.012, 0.08, Math.min(0.26, bh * 0.4), half * 0.62, soft); // поясничный упор
+      const hw = 0.3 / 2 / Rb, hy = bh + 0.05;
+      const stem = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.12, 0.022), frame);
+      stem.position.set(0, bh + 0.02, -0.02); bk.add(stem);
+      arc(Rb, 0.15, hy + 0.06, hw, meshM);
+      arc(Rb + 0.004, 0.022, hy + 0.13, hw + 0.02, frame);
+    }
+    for (const sx of [-1, 1]) {                                           // подлокотники
+      const x = sx * (sw / 2 + 0.03), y0 = seatTop - 0.09, ah = 0.27;
+      B(g, 0.09, 0.025, 0.05, sx * (sw / 2 - 0.02), y0, -0.02, frame);
+      B(g, 0.028, ah, 0.05, x, y0 + ah / 2, -0.03, frame);
+      softSlab(g, 0.075, 0.25, 0.03, x, y0 + ah, -0.01, 0.03, 0.008, soft);
+    }
+  },
+  // стеклянный чайник по фото: подставка, стальные пояса внизу и вверху, прозрачная колба,
+  // носик слева и чёрная ручка справа. Цвет предмета — цвет стали
+  kettleGlass(g, W, D, H, c) {
+    const steel = mat(c, 0.25, 0.85), black = mat('#17181a', 0.5);
+    const glass = mat('#dbe7ee', 0.05, 0, { transparent: true, opacity: 0.32, depthWrite: false });
+    const r = Math.min(D, W * 0.66) / 2, spout = Math.min(0.022, W * 0.1), cx = -W / 2 + spout + r;
+    const baseH = 0.022, kb = baseH + 0.002, bandB = H * 0.15, bandT = H * 0.16, lid = 0.012;
+    C(g, r * 1.04, r * 1.08, baseH, cx, baseH / 2, 0, black, 32);
+    C(g, r, r * 0.99, bandB, cx, kb + bandB / 2, 0, steel, 40);
+    const gh = H - kb - bandB - bandT - lid;
+    const gl = C(g, r * 0.975, r * 0.99, gh, cx, kb + bandB + gh / 2, 0, glass, 40); gl.castShadow = false;
+    C(g, r * 0.965, r * 0.975, bandT, cx, H - lid - bandT / 2, 0, steel, 40);
+    C(g, r * 0.94, r * 0.965, lid * 0.5, cx, H - lid * 0.75, 0, black, 40);
+    C(g, r * 0.8, r * 0.88, lid * 0.5, cx, H - lid * 0.25, 0, steel, 40);
+    const sp = B(g, spout + 0.018, 0.022, 0.034, -W / 2 + (spout + 0.018) / 2, H - lid - 0.022, 0, black);
+    sp.rotation.z = -0.35;
+    const hx0 = cx + r - 0.004, hx1 = W / 2, hw = hx1 - hx0;
+    B(g, 0.022, H * 0.62, 0.028, hx1 - 0.011, kb + bandB * 0.6 + (H * 0.62) / 2, 0, black);
+    B(g, hw, 0.026, 0.03, hx0 + hw / 2, H - lid - 0.016, 0, black);
+    B(g, hw, 0.022, 0.026, hx0 + hw / 2, kb + bandB * 0.6, 0, black);
+  },
+  // микроволновка по фото: белый корпус, спереди чёрная стеклянная дверца и узкая чёрная панель
+  // с двумя крутилками справа
+  microwave(g, W, D, H, c) {
+    const body = mat(c, 0.35), front = mat('#111214', 0.1, 0.15), knobM = mat('#c9ccd0', 0.3, 0.7), foot = mat('#2a2b2d', 0.6);
+    const ft = 0.01, h = H - ft, zf = D / 2;
+    B(g, W, h, D, 0, ft + h / 2, 0, body);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) C(g, 0.012, 0.012, ft, sx * (W / 2 - 0.04), ft / 2, sz * (D / 2 - 0.04), foot, 10);
+    const pw = W * 0.23, dw = W - pw - 0.026, m = 0.011;
+    B(g, dw, h - 2 * m, 0.01, -W / 2 + m + dw / 2, ft + h / 2, zf + 0.005, front);
+    B(g, pw - 0.004, h - 2 * m, 0.01, W / 2 - m - (pw - 0.004) / 2, ft + h / 2, zf + 0.005, front);
+    B(g, dw * 0.66, h * 0.56, 0.002, -W / 2 + m + dw * 0.46, ft + h * 0.52, zf + 0.0105, mat('#22262a', 0.15, 0.2), false);
+    for (const k of [0.68, 0.34]) {
+      const kn = C(g, 0.018, 0.018, 0.016, W / 2 - m - pw / 2, ft + h * k, zf + 0.018, knobM, 20);
+      kn.rotation.x = Math.PI / 2;
+    }
   },
   radiator(g, W, D, H, c) {
     const m = mat(c, 0.4);

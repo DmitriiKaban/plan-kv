@@ -6,14 +6,16 @@ import { Building } from './building.js';
 import { CATALOG, SHAPES, SWATCHES, HAS_TOP, TOP_SWATCHES, iconSvg, shapeName } from './catalog.js';
 import { kitchenItems, kitchenApron, KITCHEN_SET, KITCHEN_OLD, KITCHEN_H, KITCHEN_RUN, KITCHEN_WALL } from './kitchen.js';
 import { bathItems, BATH_SET, BATH_OLD } from './bathroom.js';
-import { wcItems, WC_SET, heatingItems, HEAT_SET, bedroomItems, BED_SET, BED_KEEP, BED_ADD, livingItems, LIVING_SET, LIVING_OLD, LIVING_KEEP, LIVING_DROP,
+import { wcItems, WC_SET, heatingItems, HEAT_SET, bedroomItems, BED_SET, BED_KEEP, BED_ADD, livingItems, LIVING_SET, LIVING_OLD, LIVING_KEEP, LIVING_SINCE, livingDrop, livingFix,
   diningItems, DINING_SET, DINING_KEEP, diningFix, airconItems, AC_SET, tvwallItems, TVWALL_SET, TVWALL_KEEP, TVWALL_DROP, TVWALL_ADD,
-  mediaItems, MEDIA_SET, MEDIA_KEEP, MEDIA_DROP, MEDIA_ADD, studyItems, STUDY_SET, STUDY_OLD } from './sets.js';
+  mediaItems, MEDIA_SET, MEDIA_KEEP, mediaDrop, MEDIA_SINCE, studyItems, STUDY_SET, STUDY_OLD,
+  chairItems, CHAIRS_SET, boilerItems, BOILER_SET, applianceItems, APPL_SET } from './sets.js';
 import { Furniture, newId } from './furniture.js';
 import { WalkControls, attachJoystick } from './walk.js';
 import { Labels, Measure, Minimap } from './overlay.js';
 import { LAMINATE_PRESETS, PLANK_SIZES } from './laminate.js';
 import * as Store from './storage.js';
+import { drawCoverPreview } from './finishes.js';
 
 const MM = 0.001;
 const $ = (s, r = document) => r.querySelector(s);
@@ -43,7 +45,8 @@ if (!state || !Array.isArray(state.layouts) || !state.layouts.length) {
   state = { v: 1, layouts: [{ id: 'l1', name: 'Вариант 1', items: [] }], current: 'l1' };
 }
 state.settings = { ...DEFAULTS, ...(state.settings || {}) };
-for (const l of state.layouts) { l.items = Store.cleanItems(l.items); l.id = l.id || newId(); l.name = l.name || 'Вариант'; }
+for (const l of state.layouts) { l.items = Store.cleanItems(l.items); l.walls = Store.cleanWalls(l.walls); l.id = l.id || newId(); l.name = l.name || 'Вариант'; }
+state.wallpapers = Store.cleanUserCovers(state.wallpapers);   // свои обои по фото (картинки — отдельно, см. storage.js)
 if (!state.layouts.some((l) => l.id === state.current)) state.current = state.layouts[0].id;
 // Встроенная мебель (кухня, ванная) ставится во все варианты один раз. Если её удалить — сама не вернётся.
 // Новая версия набора заменяет старые (old) или дополняет их (keep: что уже стоит и, может быть, подвинуто, — остаётся,
@@ -55,30 +58,40 @@ const SETS = [
   { id: WC_SET, old: [], title: 'Туалет', items: wcItems },
   { id: HEAT_SET, old: [], title: 'Батареи', items: heatingItems },
   { id: BED_SET, old: [], keep: BED_KEEP, add: BED_ADD, title: 'Спальня', items: bedroomItems },
-  { id: LIVING_SET, old: LIVING_OLD, keep: LIVING_KEEP, drop: LIVING_DROP, title: 'Гостиная', items: livingItems },
+  { id: LIVING_SET, old: LIVING_OLD, keep: LIVING_KEEP, drop: livingDrop, fix: livingFix, since: LIVING_SINCE, title: 'Гостиная', items: livingItems },
   { id: DINING_SET, old: [], keep: DINING_KEEP, add: [], fix: diningFix, title: 'Стол на кухне', items: diningItems },
   { id: AC_SET, old: [], title: 'Кондиционер', items: airconItems },
   { id: TVWALL_SET, old: [], keep: TVWALL_KEEP, drop: TVWALL_DROP, add: TVWALL_ADD, title: 'Шкаф и тумба под телевизор', items: tvwallItems },
-  { id: MEDIA_SET, old: [], keep: MEDIA_KEEP, drop: MEDIA_DROP, add: MEDIA_ADD, title: 'Стеллаж, панели и техника', items: mediaItems },
+  { id: MEDIA_SET, old: [], keep: MEDIA_KEEP, drop: mediaDrop, since: MEDIA_SINCE, title: 'Стеллаж, панели и техника', items: mediaItems },
   { id: STUDY_SET, old: STUDY_OLD, title: 'Стол у окна в спальне', items: studyItems },
+  { id: CHAIRS_SET, old: [], title: 'Стулья к столам', items: chairItems },
+  { id: BOILER_SET, old: [], title: 'Бойлер', items: boilerItems },
+  { id: APPL_SET, old: [], title: 'Техника на кухне', items: applianceItems },
 ];
 state.sets = state.sets || {};
+const vnum = (id) => +(String(id || '').match(/-v(\d+)$/) || [0, 0])[1];   // номер версии набора: 'living-v3' → 3
 const setsJustAdded = [], setsUpdated = [];
 for (const set of SETS) {
   if (state.sets[set.id]) continue;
-  const keep = set.keep || [], drop = set.drop || [], prev = [...set.old, ...keep];
+  const keep = set.keep || [], prev = [...set.old, ...keep];
+  // drop — имена предметов или проверка (it) => bool: такие предметы прежней версии ставятся заново
+  const dropIt = typeof set.drop === 'function' ? set.drop : (it) => (set.drop || []).includes(it.name);
   const replaces = prev.some((id) => state.sets[id]) || state.layouts.some((l) => l.items.some((it) => prev.includes(it.set)));
   for (const l of state.layouts) {
     const hadOld = l.items.some((it) => set.old.includes(it.set));
-    l.items = l.items.filter((it) => !set.old.includes(it.set) && !(keep.includes(it.set) && drop.includes(it.name)));
+    const dropped = l.items.filter((it) => keep.includes(it.set) && dropIt(it));
+    l.items = l.items.filter((it) => !set.old.includes(it.set) && !dropped.includes(it));
     const mine = l.items.filter((it) => it.set === set.id || keep.includes(it.set));
+    const from = Math.max(0, ...[...mine, ...dropped].map((it) => vnum(it.set)));
     for (const it of mine) { if (set.fix && keep.includes(it.set)) Object.assign(it, set.fix(it)); it.set = set.id; }
-    if (!keep.length) { if (!mine.length) l.items.push(...Store.cleanItems(set.items(l.items))); continue; }
     // набора в варианте ещё не было или стояла старая версия — ставим целиком; если его удалили из варианта — не возвращаем
-    if (!mine.length) { if (!replaces || hadOld) l.items.push(...Store.cleanItems(set.items(l.items))); continue; }
-    // дополнение: добавляется только то, чего в варианте ещё нет (и только новое, если задан add)
-    const names = new Set(mine.map((it) => it.name));
-    l.items.push(...Store.cleanItems(set.items(l.items).filter((it) => !names.has(it.name) && (!set.add || set.add.includes(it.name)))));
+    if (!mine.length && !dropped.length) { if (!replaces || hadOld) l.items.push(...Store.cleanItems(set.items(l.items))); continue; }
+    if (!keep.length) continue;
+    // дополнение: заново ставится то, что заменяется (по типу предмета), и то, чего в той версии набора ещё не было;
+    // удалённое хозяином не возвращается. Без since — по старому правилу: всё недостающее (или только из add)
+    const names = new Set(mine.map((it) => it.name)), redo = new Set(dropped.map((it) => it.type));
+    const fresh = (it) => (set.since ? from < vnum(set.since[it.type]) : !set.add || set.add.includes(it.name));
+    l.items.push(...Store.cleanItems(set.items(l.items).filter((it) => !names.has(it.name) && (redo.has(it.type) || fresh(it)))));
   }
   state.sets[set.id] = true;
   (replaces ? setsUpdated : setsJustAdded).push(set.title.toLowerCase());
@@ -128,8 +141,9 @@ scene.add(ground);
 
 PLAN.FINISHES.push(kitchenApron());              // фартук зависит от гарнитура, поэтому описан в kitchen.js
 const building = new Building(scene, PLAN, renderer);
-const WALLPAPERS = PLAN.FINISHES.filter((f) => f.kind === 'wallpaper').map((f) => f.id);
-building.finishOn = { tile: S.tile, brick: S.brick, apron: S.apron, ...Object.fromEntries(WALLPAPERS.map((id) => [id, S.wallpaper])) };
+building.finishOn = { tile: S.tile, brick: S.brick, apron: S.apron, wallpaper: S.wallpaper };
+building.covers = curLayout().walls;                  // обои, поменянные в этом варианте
+for (const u of state.wallpapers) building.setUserCover({ ...u, canvas: null });   // картинки подгрузятся при запуске
 building.baseboardOn = S.baseboard;
 building.build({ ceiling: S.ceiling, wallColor: S.wallColor, laminate: S.laminate, plankSize: S.plankSize, plankDir: S.plankDir });
 building.setFlags({ doors: S.doors, swings: S.swings, ceiling: false });
@@ -183,7 +197,7 @@ canvas.addEventListener('pointermove', onPointerMove);
 canvas.addEventListener('pointerup', onPointerUp);
 canvas.addEventListener('pointercancel', onPointerUp);
 canvas.addEventListener('dblclick', (e) => {
-  if (mode === 'walk' || measure.active) return;
+  if (mode === 'walk' || measure.active || wallTool.active) return;
   setRay(e);
   if (furniture.pick(ray)) return;               // двойной щелчок по мебели — не телепорт
   walkHere(e);
@@ -286,6 +300,7 @@ function setMode(m) {
   }
   if (m === 'walk') { walk.apply(); updateRoomChip(); if (isMobile() && furniture.selectedId) furniture.select(null); }
   if (measure.active) measure.cancel();
+  if (m === 'plan' && wallTool.active) toggleWallTool(false);
   requestRender();
 }
 // срез стен в обзоре: на заданной высоте; если она не ниже потолка — стены целиком
@@ -341,8 +356,8 @@ function onPointerDown(e) {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   if (ptr) { ptr.multi = true; return; }        // второй палец — это жест камеры, не нажатие
   const base = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
-  if (measure.active) {
-    ptr = { ...base, kind: 'measure' };
+  if (measure.active || wallTool.active) {
+    ptr = { ...base, kind: measure.active ? 'measure' : 'wall' };
     if (mode === 'walk') { walk.lookStart(e); canvas.setPointerCapture(e.pointerId); }
     return;
   }
@@ -377,7 +392,7 @@ function onPointerMove(e) {
       const rx = fp.x / MM + ptr.dx, ry = fp.z / MM + ptr.dy;
       const [x, y] = e.altKey ? [Math.round(rx), Math.round(ry)] : furniture.snap(it, rx, ry);
       if (x !== it.x || y !== it.y) { furniture.update(it.id, { x, y }, false); requestRender(); }
-    } else if (mode === 'walk' && (ptr.kind === 'look' || ptr.kind === 'measure')) {
+    } else if (mode === 'walk' && (ptr.kind === 'look' || ptr.kind === 'measure' || ptr.kind === 'wall')) {
       if (walk.lookMove(e)) requestRender();
     }
     return;
@@ -390,6 +405,7 @@ function onPointerMove(e) {
 function hover(e) {
   if (!e) return;
   if (measure.active) { measure.hover(measureHit(e)); requestRender(); return; }
+  if (wallTool.active) { hoverWall(e); return; }
   if (mode === 'walk') { app.classList.remove('grab'); return; }
   setRay(e);
   const it = furniture.pick(ray);
@@ -412,6 +428,7 @@ function onPointerUp(e) {
     if (hit) { measure.click(hit); requestRender(); }
     return;
   }
+  if (p.kind === 'wall') { tapWall(e); return; }
   if (p.item) { furniture.select(p.item); return; }
   const now = performance.now();
   if (lastTap && now - lastTap.t < 340 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30 && mode !== 'walk' && e.pointerType !== 'mouse') {
@@ -432,7 +449,8 @@ $('#minimap').addEventListener('click', (e) => {
 
 // ── мебель: изменения и история ──────────────────────────────────────────────
 const hist = { stack: [], idx: -1 };
-function snapshot() { return JSON.stringify(furniture.items); }   // с идентификаторами — чтобы после отмены выделение не перескакивало
+// мебель (с идентификаторами — чтобы после отмены выделение не перескакивало) и обои варианта
+function snapshot() { return JSON.stringify({ i: furniture.items, w: curLayout().walls || {} }); }
 function resetHistory() { hist.stack = [snapshot()]; hist.idx = 0; updateUndo(); }
 function commitHistory() {
   const s = snapshot();
@@ -445,8 +463,9 @@ function commitHistory() {
 }
 function restore(idx) {
   hist.idx = idx;
-  const sel = furniture.selectedId;
-  furniture.setItems(JSON.parse(hist.stack[idx]));
+  const sel = furniture.selectedId, snap = JSON.parse(hist.stack[idx]), l = curLayout();
+  furniture.setItems(snap.i);
+  if (JSON.stringify(l.walls || {}) !== JSON.stringify(snap.w || {})) { l.walls = snap.w || {}; building.setCovers(l.walls); renderWallCard(); }
   if (sel && furniture.byId(sel)) furniture.select(sel); else furniture.select(null);
   obstacleCache = null;
   persist(); updateUndo(); renderList(); renderLayouts(); shadowsDirty();
@@ -625,12 +644,15 @@ function renderSetCard() {
     [WC_SET]: { sw: ['#d9d5cf', '#f6f6f4', '#f6f6f4'], text: 'Унитаз в 30 см от дальней стены' },
     [HEAT_SET]: { sw: ['#f4f4f2', '#f3f3f0', '#c8372a'], text: 'Кухня 4, гостиная 12, спальня 9 секций, трубы у стояков' },
     [BED_SET]: { sw: ['#d3ccc2', '#ebe7e0', '#c9a27a'], text: 'Кровать 170 × 214 поперёк комнаты, тумбочки и бра по бокам, шкаф-купе 140 справа от входа' },
-    [LIVING_SET]: { sw: ['#8c8b6a', '#b5814f', '#1e1e20'], text: 'Диван 215 у стены спальни, рабочий стол 140 у левой стены возле окна' },
-    [DINING_SET]: { sw: ['#a27c58', '#fbfaf6', '#b8955a'], text: 'Стол 80 × 80 в углу, в 20 см от окна, над ним бра с шариками' },
+    [LIVING_SET]: { sw: ['#8c8b6a', '#b5814f', '#1e1e20'], text: 'Диван 215 у стены спальни, рабочий стол 130 у левой стены возле окна' },
+    [DINING_SET]: { sw: ['#a27c58', '#fbfaf6', '#b8955a'], text: 'Стол 80 × 80 в углу, в 20 см от окна, над ним бра с шариками 40 см' },
     [AC_SET]: { sw: ['#f7f7f5', '#e9e9e6', '#3a3d40'], text: 'В прихожей под потолком, между дверью в гостиную и углом спальни' },
     [TVWALL_SET]: { sw: ['#e7e0d6', '#6f4d36', '#1c1d1f'], text: 'По чертежу, 3,6 м вдоль левой стены гостиной от угла: шкаф 90, тумба 268, полки внутри 45, телевизор' },
-    [MEDIA_SET]: { sw: ['#6f4d36', '#1c1c1d', '#1b1c1e'], text: 'Стеллаж 30 между тумбой и столом, рейки у телевизора, саундбар, проигрыватель, монитор' },
-    [STUDY_SET]: { sw: ['#f1f1ee', '#cfb38e', '#4a4642'], text: 'Столешница — продолжение подоконника; по бокам шкафы 30 и полки для цветов 17, внизу ящики' },
+    [MEDIA_SET]: { sw: ['#6f4d36', '#1c1c1d', '#1b1c1e'], text: 'Стеллаж 35 между тумбой и столом, рейки у телевизора, саундбар, проигрыватель, монитор' },
+    [STUDY_SET]: { sw: ['#f1f1ee', '#cfb38e', '#4a4642'], text: 'Глубина 50 см, столешница — продолжение подоконника; по бокам шкафы 30 и полки для цветов 17, внизу ящики' },
+    [CHAIRS_SET]: { sw: ['#1d1e20', '#3a3c3f', '#9a9ea3'], text: 'Кресло с подголовником — за рабочий стол в гостиной, компьютерный стул — к столу у окна в спальне' },
+    [BOILER_SET]: { sw: ['#f4f4f2', '#dfe1e2', '#4fb6ff'], text: '⌀38,5 × 77 на стене за унитазом, низ на 1,45 м' },
+    [APPL_SET]: { sw: ['#c3c7cb', '#f4f4f2', '#111214'], text: 'Чайник слева от плиты, микроволновка на угловой столешнице у холодильника' },
   };
   $('#setCard').innerHTML = `<h3>Расставлено по твоим описаниям</h3>` + SETS.map((set, i) => {
     const c = info[set.id] || { sw: ['#eee', '#ddd', '#ccc'], text: '' };
@@ -714,11 +736,12 @@ function switchLayout(id, saveCurrent = true) {
   state.current = id;
   furniture.select(null);
   furniture.setItems(curLayout().items.map((it) => ({ id: newId(), ...it })));
+  building.setCovers(curLayout().walls);
   obstacleCache = null;
-  resetHistory(); renderList(); renderLayouts(); persist(); shadowsDirty();
+  resetHistory(); renderList(); renderLayouts(); persist(); shadowsDirty(); renderWallCard();
 }
-function addLayout(name, items) {
-  const l = { id: newId(), name: name.slice(0, 40), items: Store.cleanItems(items) };
+function addLayout(name, items, walls = {}) {
+  const l = { id: newId(), name: name.slice(0, 40), items: Store.cleanItems(items), walls: Store.cleanWalls(walls) };
   state.layouts.push(l);
   switchLayout(l.id);
   return l;
@@ -796,7 +819,7 @@ function renderSettings() {
     ['#optTile', 'tile', (v) => { building.setFinish('tile', v); shadowsDirty(); }],
     ['#optBrick', 'brick', (v) => { building.setFinish('brick', v); shadowsDirty(); }],
     ['#optApron', 'apron', (v) => { building.setFinish('apron', v); shadowsDirty(); }],
-    ['#optWallpaper', 'wallpaper', (v) => { for (const id of WALLPAPERS) building.setFinish(id, v); shadowsDirty(); }],
+    ['#optWallpaper', 'wallpaper', (v) => { building.setFinish('wallpaper', v); shadowsDirty(); }],
     ['#optBaseboard', 'baseboard', (v) => { building.setBaseboard(v); shadowsDirty(); }],
   ];
   for (const [id, key, fn] of toggles) {
@@ -828,7 +851,37 @@ function setShadows(v) {
 function savePrefs() { persist(); requestRender(); }
 
 // ── данные: файл, код, ссылка ────────────────────────────────────────────────
-function layoutPayload() { const l = curLayout(); return { app: 'apartment-3d', v: 1, name: l.name, items: furniture.items.map(strip) }; }
+// файл — с картинками своих обоев; код и ссылка — без них (вместо фото на другом устройстве будет его основной цвет)
+function layoutPayload(withImg = true) {
+  const l = curLayout(), p = { app: 'apartment-3d', v: 1, name: l.name, items: furniture.items.map(strip) };
+  if (Object.keys(l.walls || {}).length) {
+    p.walls = withImg ? l.walls : wallsForShare(l.walls);
+    const ws = usedPhotos(l.walls).map((u) => ({ ...u, img: Store.loadCoverImage(u.id) || undefined }));
+    if (withImg && ws.length) p.wallpapers = ws;
+  }
+  return p;
+}
+const usedPhotos = (walls) => { const ids = new Set(Object.values(walls || {}).map((v) => v.id)); return state.wallpapers.filter((u) => ids.has(u.id)); };
+function wallsForShare(walls) {
+  const out = {};
+  for (const [k, v] of Object.entries(walls || {})) {
+    const u = state.wallpapers.find((q) => q.id === v.id);
+    out[k] = u ? { ...v, a: u.avg, n: u.name } : v;
+  }
+  return out;
+}
+// свои обои из файла: картинки сохраняются в этом браузере
+async function importPhotos(list) {
+  let added = 0;
+  for (const u of list || []) {
+    if (!u.img || state.wallpapers.some((q) => q.id === u.id)) continue;
+    const { img, ...meta } = u;
+    Store.saveCoverImage(u.id, img);
+    state.wallpapers.push(meta);
+    try { building.setUserCover({ ...meta, canvas: imageCanvas(await loadImage(img)) }); added++; } catch (e) { building.setUserCover({ ...meta, canvas: null }); }
+  }
+  if (added) { building.setCovers(curLayout().walls); persist(); shadowsDirty(); renderWallCard(true); }
+}
 async function copyText(text, okMsg, title) {
   try { await navigator.clipboard.writeText(text); toast(okMsg); }
   catch (e) {
@@ -838,7 +891,7 @@ async function copyText(text, okMsg, title) {
 }
 function bindData() {
   $('#layoutSel').addEventListener('change', (e) => switchLayout(e.target.value));
-  $('#layoutCopy').addEventListener('click', () => { const l = curLayout(); addLayout(`${l.name} — копия`, furniture.items.map(strip)); toast('Копия создана — меняйте её, исходный вариант останется'); });
+  $('#layoutCopy').addEventListener('click', () => { const l = curLayout(); addLayout(`${l.name} — копия`, furniture.items.map(strip), l.walls); toast('Копия создана — меняйте её, исходный вариант останется'); });
   $('#layoutRename').addEventListener('click', async () => {
     const l = curLayout();
     const ok = await dialog('Название варианта', `<input type="text" id="dlgName" maxlength="40" value="${esc(l.name)}">`, [['Отмена', false], ['Сохранить', true]]);
@@ -857,23 +910,25 @@ function bindData() {
     if (inFrame) { copyText(JSON.stringify(p), 'Код расстановки скопирован', 'Код расстановки'); return; }
     Store.downloadJson(`kvartira-${p.name.replace(/[^\wа-яё-]+/gi, '_')}.json`, p);
   });
-  $('#dCopy').addEventListener('click', () => copyText(JSON.stringify(layoutPayload()), 'Код расстановки скопирован', 'Код расстановки'));
+  $('#dCopy').addEventListener('click', () => copyText(JSON.stringify(layoutPayload(false)), 'Код расстановки скопирован', 'Код расстановки'));
   if (inFrame) $('#dLink').hidden = true;
   $('#dLink').addEventListener('click', async () => {
-    const code = await Store.encodeLayout({ name: curLayout().name, items: furniture.items });
+    const l = curLayout();
+    const code = await Store.encodeLayout({ name: l.name, items: furniture.items, walls: wallsForShare(l.walls) });
     const url = `${location.origin}${location.pathname}#l=${code}`;
-    copyText(url, 'Ссылка скопирована — откройте её на телефоне или отправьте', 'Ссылка на расстановку');
+    copyText(url, usedPhotos(l.walls).length ? 'Ссылка скопирована. Свои обои по фото в неё не помещаются — там будет их основной цвет; с фото — через «Скачать файл»'
+      : 'Ссылка скопирована — откройте её на телефоне или отправьте', 'Ссылка на расстановку');
   });
   $('#dImport').addEventListener('change', async (e) => {
     const f = e.target.files[0]; e.target.value = '';
     if (!f) return;
-    try { const l = Store.parseLayoutText(await f.text()); addLayout(l.name, l.items); toast(`Открыт вариант «${l.name}»`); }
+    try { const l = Store.parseLayoutText(await f.text()); addLayout(l.name, l.items, l.walls); importPhotos(l.wallpapers); toast(`Открыт вариант «${l.name}»`); }
     catch (err) { toast('Не получилось прочитать файл: ' + err.message); }
   });
   $('#dPaste').addEventListener('click', async () => {
     const ok = await dialog('Вставить код расстановки', '<textarea id="dlgCode" rows="7" placeholder="{&quot;items&quot;: [...]}"></textarea>', [['Отмена', false], ['Открыть', true]]);
     if (!ok) return;
-    try { const l = Store.parseLayoutText(dialog.last.dlgCode || ''); addLayout(l.name, l.items); toast(`Открыт вариант «${l.name}»`); }
+    try { const l = Store.parseLayoutText(dialog.last.dlgCode || ''); addLayout(l.name, l.items, l.walls); importPhotos(l.wallpapers); toast(`Открыт вариант «${l.name}»`); }
     catch (err) { toast('Код не подошёл: ' + err.message); }
   });
   $('#dClear').addEventListener('click', async () => {
@@ -928,9 +983,243 @@ function showHelp() {
       <li><b>Мебель</b> — выберите из каталога или впишите размеры с ценника. Предмет можно таскать, поворачивать и менять размеры.</li>
       <li>Синие цифры — расстояние от выбранного предмета до стен и соседней мебели, в сантиметрах. Красный контур — предмет заходит в стену или в другую мебель, оранжевая надпись — мешает открыть дверь.</li>
       <li><b>Рулетка</b> — нажмите две точки, покажет расстояние.</li>
+      <li><b>Обои</b> — валик слева${touch ? '' : ' (<kbd>O</kbd>)'}: нажмите на стену и выберите обои, оттенок или своё фото обоев. Можно сразу на всю комнату. Обои хранятся в варианте — сделайте копию варианта, чтобы сравнить.</li>
       ${touch ? '' : '<li>Клавиши: <kbd>R</kbd> — повернуть, <kbd>Del</kbd> — удалить, <kbd>Ctrl</kbd>+<kbd>D</kbd> — копия, стрелки — сдвиг на 1 см (с <kbd>Shift</kbd> — на 10), <kbd>Ctrl</kbd>+<kbd>Z</kbd> — отменить.</li>'}
     </ul>
     <p>Всё сохраняется в этом браузере. Для другого устройства — «Расстановка» → «Скопировать ссылку» или «Скачать файл».</p>`, [['Понятно', true]]);
+}
+
+// ── обои: инструмент «валик» и карточка стены ────────────────────────────────
+// Включили валик → нажатие на стену выбирает её (мебель в это время не мешает), в карточке — обои, оттенок,
+// своё фото. Обои хранятся в варианте: l.walls[ключ стены] = { id, c }; что совпадает с планом — не хранится.
+const TINTS = [['#f4eee4', 'Беж'], ['#ebe6de', 'Тёплый серый'], ['#e3e5e2', 'Светло-серый'], ['#dce3d6', 'Шалфей'], ['#dbe3ea', 'Голубой'], ['#f0dfd6', 'Пудра'], ['#d9d0c2', 'Тауп'], ['#c8c3ba', 'Серо-бежевый']];
+const wallTool = { active: false, key: null };
+
+function toggleWallTool(on = !wallTool.active) {
+  wallTool.active = on;
+  app.classList.toggle('walling', on);
+  $('#tWall').setAttribute('aria-pressed', String(on));
+  if (on) {
+    if (measure.active) toggleMeasure(false);
+    furniture.select(null);
+    if (mode === 'plan') setMode('orbit');            // сверху стен не видно
+    if (isMobile()) setPanel(false);
+  } else {
+    selectWall(null);
+  }
+  building.highlightSurface(null, 'hover');
+  requestRender();
+}
+
+// стена под указателем (мебель не мешает: луч идёт только по стенам, полу и потолку)
+function wallAt(e) {
+  setRay(e);
+  const hit = ray.intersectObjects(building.pickables, false).find((h) => building.hitVisible(h));
+  return hit ? building.surfaceAt(hit) : null;
+}
+function hoverWall(e) {
+  const sf = wallAt(e);
+  building.highlightSurface(sf && sf.editable && sf.key !== wallTool.key ? sf.key : null, 'hover');
+  requestRender();
+}
+// выбранная стена вспыхивает и гаснет — заливка не должна искажать цвет обоев, ради которого её выбрали
+let flash = null;
+function flashWall(key) {
+  if (flash) cancelAnimationFrame(flash.raf);
+  building.highlightSurface(key, 'sel');
+  const m = building.mat.hl && building.mat.hl.sel;
+  if (!key || !m) { flash = null; return; }
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / 900);
+    m.opacity = 0.28 * (1 - k * k);
+    requestRender();
+    if (k < 1) flash.raf = requestAnimationFrame(step);
+    else { building.highlightSurface(null, 'sel'); m.opacity = 0.28; flash = null; }
+  };
+  flash = { raf: requestAnimationFrame(step) };
+}
+function selectWall(key) {
+  wallTool.key = key;
+  flashWall(key);
+  if (key) building.highlightSurface(null, 'hover');
+  $('#wallCard').hidden = !key;
+  if (key) renderWallCard(true);
+  requestRender();
+}
+function tapWall(e) {
+  const sf = wallAt(e);
+  if (!sf) { selectWall(null); return; }
+  if (!sf.editable) { toast(`${sf.roomName}: здесь плитка, её не меняем`); return; }
+  selectWall(sf.key);
+}
+
+// название покрытия для карточки
+function coverInfo(cv) {
+  if (cv.finish) { const f = PLAN.FINISHES.find((q) => q.id === cv.finish); return { name: f ? f.name : 'Плитка', note: '' }; }
+  const base = PLAN.COVERS.find((q) => q.id === cv.id);
+  if (base) return { name: base.name, note: base.note, base };
+  const user = state.wallpapers.find((q) => q.id === cv.id);
+  if (user) return { name: user.name, note: 'своё фото', user };
+  return { name: cv.n || 'Своё фото', note: 'фото осталось на устройстве, где его добавили', missing: true };
+}
+const sameCover = (a, b) => a.id === b.id && (a.c || '') === (b.c || '');
+// записать покрытие стены в обои варианта; если оно как по плану — правка не нужна
+function putCover(walls, sf, spec) {
+  const plan = building.planCover(sf);
+  if (!plan.finish && sameCover(plan, spec)) delete walls[sf.key]; else walls[sf.key] = spec;
+}
+function applyCover(keys, spec, record = true) {
+  const l = curLayout(), walls = { ...(l.walls || {}) };
+  for (const k of keys) { const sf = building.surface(k); if (sf && sf.editable) putCover(walls, sf, { ...spec }); }
+  l.walls = walls;
+  building.setCovers(walls);
+  if (record) commitHistory(); else persist();
+  renderWallCard();
+  shadowsDirty();
+}
+
+function paintPreview(cv, lk) {
+  if (!lk || lk.kind === 'paint') { drawCoverPreview(cv, null, 1, 1, lk ? lk.color : S.wallColor); return; }
+  const tx = building.texFor(lk);
+  drawCoverPreview(cv, tx && tx.t.map.image, tx ? tx.repW : 1, tx ? tx.repH : 1, lk.color);
+}
+function buildCoverGrid() {
+  const all = [...PLAN.COVERS.map((c) => ({ id: c.id, name: c.name, title: `${c.name} — ${c.note}` })),
+    ...state.wallpapers.map((u) => ({ id: u.id, name: u.name, title: `${u.name} — своё фото` }))];
+  $('#wcCovers').innerHTML = all.map((c) => `<button data-id="${esc(c.id)}" title="${esc(c.title)}"><canvas width="112" height="112"></canvas><span>${esc(c.name)}</span></button>`).join('')
+    + '<label class="add-photo" title="Фото образца обоев или картинка из магазина — она повторится по стене"><i>+</i><span>Своё фото</span><input type="file" id="wcPhoto" accept="image/*"></label>';
+  $$('#wcCovers button').forEach((b, i) => paintPreview(b.querySelector('canvas'), building.look({ id: all[i].id })));
+  $('#wcPhoto').addEventListener('change', onPhotoPicked);
+}
+function renderWallCard(grid = false) {
+  const card = $('#wallCard'), sf = wallTool.key && building.surface(wallTool.key);
+  if (!sf) { card.hidden = true; return; }
+  const own = (curLayout().walls || {})[sf.key], cv = building.coverOf(sf), info = coverInfo(cv);
+  $('#wcRoom').textContent = sf.roomName;
+  $('#wcInfo').textContent = `стена ${dec(sf.len / 1000, 2)} м${sf.win && sf.door ? ', с окном и дверью' : sf.win ? ', с окном' : sf.door ? ', с дверью' : ''}`;
+  $('#wcNow').innerHTML = `<b>${esc(info.name)}</b>${info.note ? ` — ${esc(info.note)}` : ''}${cv.c ? ', свой оттенок' : ''}${own ? '' : '<em>как по плану</em>'}`;
+  if (grid || !$('#wcCovers').childElementCount) buildCoverGrid();
+  $$('#wcCovers button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === cv.id)));
+  // оттенок: у обоев — от образца, у краски — цвета стен; у своего фото оттенка нет
+  const tintable = !info.user && !info.missing && !cv.finish;
+  $('#wcColorRow').hidden = !tintable;
+  if (tintable) {
+    const paint = cv.id === 'paint', def = paint ? S.wallColor : info.base.color, cur = (cv.c || def).toLowerCase();
+    const list = paint ? WALL_COLORS : [[info.base.color, 'Как у образца'], ...TINTS];
+    $('#wcColors').innerHTML = list.map(([c, n]) => `<button data-c="${c}" style="background:${c}" title="${n}" aria-label="${n}" aria-pressed="${c.toLowerCase() === cur}"></button>`).join('')
+      + `<input type="color" value="${cur}" aria-label="Свой оттенок">`;
+  }
+  $('#wcPhotoRow').hidden = !info.user;
+  if (info.user && document.activeElement !== $('#wcPhotoW')) $('#wcPhotoW').value = cmVal(info.user.w);
+  $('#wcReset').disabled = !own;
+  $('#wcRoomAll').disabled = !!cv.finish;
+}
+function setTint(c, record = true) {
+  const sf = building.surface(wallTool.key); if (!sf) return;
+  const cv = building.coverOf(sf); if (cv.finish) return;
+  const base = PLAN.COVERS.find((q) => q.id === cv.id), def = cv.id === 'paint' ? null : base && base.color;
+  const spec = { id: cv.id };
+  if (!def || c.toLowerCase() !== def.toLowerCase()) spec.c = c.toLowerCase();
+  applyCover([sf.key], spec, record);
+}
+
+// своё фото: уменьшаем до 1024 px, храним как JPEG; основной цвет — на случай, если фото не будет
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = typeof src === 'string' ? src : URL.createObjectURL(src);
+    img.onload = () => { if (typeof src !== 'string') URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { if (typeof src !== 'string') URL.revokeObjectURL(url); reject(new Error('картинка не открылась')); };
+    img.src = url;
+  });
+}
+function imageCanvas(img, max = 1024) {
+  const k = Math.min(1, max / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+  const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round((img.naturalWidth || img.width) * k)); cv.height = Math.max(1, Math.round((img.naturalHeight || img.height) * k));
+  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+  return cv;
+}
+function avgColor(cv) {
+  const one = document.createElement('canvas'); one.width = one.height = 1;
+  const c = one.getContext('2d'); c.drawImage(cv, 0, 0, 1, 1);
+  const d = c.getImageData(0, 0, 1, 1).data;
+  return '#' + [d[0], d[1], d[2]].map((v) => v.toString(16).padStart(2, '0')).join('');
+}
+async function onPhotoPicked(e) {
+  const f = e.target.files[0]; e.target.value = '';
+  const key = wallTool.key;
+  if (!f || !key) return;
+  let cv;
+  try { cv = imageCanvas(await loadImage(f)); } catch (err) { toast('Не получилось открыть картинку — попробуйте JPEG или PNG'); return; }
+  const id = 'u' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+  const name = (f.name || '').replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim().slice(0, 30) || `Фото ${state.wallpapers.length + 1}`;
+  const u = { id, name, w: 530, avg: avgColor(cv) };
+  const saved = Store.saveCoverImage(id, cv.toDataURL('image/jpeg', 0.86));
+  state.wallpapers.push(u);
+  building.setUserCover({ ...u, canvas: cv });
+  applyCover([key], { id });
+  renderWallCard(true);
+  toast(saved ? 'Фото на стене. Если рисунок крупнее или мельче, чем в жизни, поправьте ширину рисунка'
+    : 'Фото на стене, но браузеру не хватило места его сохранить — после перезагрузки его не будет');
+}
+async function loadPhotos() {
+  let n = 0;
+  for (const u of state.wallpapers) {
+    const url = Store.loadCoverImage(u.id);
+    if (!url) continue;
+    try { building.setUserCover({ ...u, canvas: imageCanvas(await loadImage(url)) }); n++; } catch (e) { /* испорченная картинка — будет основной цвет */ }
+  }
+  if (n) { building.setCovers(curLayout().walls); shadowsDirty(); if (wallTool.key) renderWallCard(true); }
+}
+
+function bindWallCard() {
+  $('#tWall').addEventListener('click', () => toggleWallTool());
+  $('#wallHintDone').addEventListener('click', () => toggleWallTool(false));
+  $('#wcClose').addEventListener('click', () => selectWall(null));
+  $('#wcCovers').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-id]');
+    if (b && wallTool.key) applyCover([wallTool.key], { id: b.dataset.id });
+  });
+  $('#wcColors').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setTint(b.dataset.c); });
+  $('#wcColors').addEventListener('input', (e) => { if (e.target.type === 'color') setTint(e.target.value, false); });
+  $('#wcColors').addEventListener('change', (e) => { if (e.target.type === 'color') commitHistory(); });
+  $('#wcRoomAll').addEventListener('click', () => {
+    const sf = building.surface(wallTool.key); if (!sf) return;
+    const cv = building.coverOf(sf); if (cv.finish) return;
+    applyCover(building.surfaces.filter((q) => q.room === sf.room && q.editable).map((q) => q.key), { id: cv.id, ...(cv.c ? { c: cv.c } : {}) });
+    toast(`${sf.roomName}: на всех стенах — ${coverInfo(cv).name}`);
+  });
+  $('#wcReset').addEventListener('click', () => {
+    const l = curLayout(); if (!wallTool.key || !(l.walls || {})[wallTool.key]) return;
+    const walls = { ...l.walls }; delete walls[wallTool.key];
+    l.walls = walls; building.setCovers(walls); commitHistory(); renderWallCard(); shadowsDirty();
+  });
+  $('#wcPhotoW').addEventListener('change', () => {
+    const sf = building.surface(wallTool.key); if (!sf) return;
+    const u = state.wallpapers.find((q) => q.id === building.coverOf(sf).id); if (!u) return;
+    const v = parseNum($('#wcPhotoW').value);
+    if (!Number.isFinite(v) || v < 5 || v > 500) { $('#wcPhotoW').value = cmVal(u.w); toast('Ширина рисунка — от 5 до 500 см'); return; }
+    u.w = Math.round(v * 10);
+    building.setUserCover({ ...building.userCovers.get(u.id), w: u.w });
+    building.setCovers(curLayout().walls); persist(); shadowsDirty();
+  });
+  $('#wcPhotoDel').addEventListener('click', async () => {
+    const sf = building.surface(wallTool.key); if (!sf) return;
+    const u = state.wallpapers.find((q) => q.id === building.coverOf(sf).id); if (!u) return;
+    if (!(await dialog('Удалить фото обоев?', `<p>«${esc(u.name)}» уберётся со всех стен во всех вариантах — там станет как по плану.</p>`, [['Отмена', false], ['Удалить', true]]))) return;
+    state.wallpapers = state.wallpapers.filter((q) => q.id !== u.id);
+    Store.removeCoverImage(u.id); building.removeUserCover(u.id);
+    for (const l of state.layouts) for (const [k, v] of Object.entries(l.walls || {})) if (v.id === u.id) delete l.walls[k];
+    building.setCovers(curLayout().walls); commitHistory(); renderWallCard(true); shadowsDirty();
+  });
+  $('#wallsPick').addEventListener('click', () => { toggleWallTool(true); if (!isMobile()) setPanel(false); toast('Нажмите на стену'); });
+  $('#wallsReset').addEventListener('click', async () => {
+    const l = curLayout();
+    if (!Object.keys(l.walls || {}).length) { toast('Обои и так как по плану'); return; }
+    if (!(await dialog('Вернуть обои как по плану?', `<p>Все стены варианта «${esc(l.name)}» станут как были. Отменить можно кнопкой ↶.</p>`, [['Отмена', false], ['Вернуть', true]]))) return;
+    l.walls = {}; building.setCovers(l.walls); commitHistory(); renderWallCard(); shadowsDirty();
+  });
 }
 
 // ── клавиатура ───────────────────────────────────────────────────────────────
@@ -944,10 +1233,16 @@ addEventListener('keydown', (e) => {
   if (mod && e.code === 'KeyY') { e.preventDefault(); redo(); return; }
   if (mod && e.code === 'KeyD') { e.preventDefault(); if (it) furniture.duplicate(it.id); return; }
   if (mod) return;
-  if (e.key === 'Escape') { if (measure.active) toggleMeasure(false); else furniture.select(null); return; }
+  if (e.key === 'Escape') {
+    if (measure.active) toggleMeasure(false);
+    else if (wallTool.active) { if (wallTool.key) selectWall(null); else toggleWallTool(false); }
+    else furniture.select(null);
+    return;
+  }
   if ((e.key === 'Delete' || e.key === 'Backspace') && it) { e.preventDefault(); furniture.remove(it.id); return; }
   if (e.code === 'KeyR' && it) { rotateSel(e.shiftKey ? -90 : 90); return; }
   if (e.code === 'KeyM') { toggleMeasure(); return; }
+  if (e.code === 'KeyO') { toggleWallTool(); return; }
   if (e.key === '1') setMode('orbit');
   if (e.key === '2') setMode('plan');
   if (e.key === '3') setMode('walk');
@@ -958,6 +1253,7 @@ addEventListener('keydown', (e) => {
 });
 
 function toggleMeasure(on = !measure.active) {
+  if (on && wallTool.active) toggleWallTool(false);
   measure.active = on;
   if (!on) measure.cancel();
   app.classList.toggle('measuring', on);
@@ -1098,13 +1394,14 @@ async function boot() {
   if (location.hash.startsWith('#l=')) {
     try {
       const l = await Store.decodeLayout(location.hash.slice(3));
-      addLayout(l.name || 'Из ссылки', l.items);
+      addLayout(l.name || 'Из ссылки', l.items, l.walls);
       setTimeout(() => toast(`Открыт вариант «${l.name}» из ссылки. Ваши варианты на месте — в «Расстановке».`), 400);
     } catch (e) { toast('Ссылка повреждена — расстановку открыть не удалось'); }
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* в песочнице может быть запрещено */ }
   }
   resetHistory();
-  renderCatalog(); renderSettings(); renderLayouts(); renderList(); bindInspector(); bindData(); areaInfo();
+  renderCatalog(); renderSettings(); renderLayouts(); renderList(); bindInspector(); bindData(); bindWallCard(); areaInfo();
+  loadPhotos();
   setMode('orbit');
   applyCut();
   if (!isMobile()) setPanel(true, 'add');
@@ -1122,6 +1419,7 @@ async function boot() {
   }
   requestAnimationFrame(frame);
   // ссылка для отладки из консоли браузера
-  window.__app = { THREE, scene, building, furniture, walk, setMode, addItem, renderer, measure, get camera() { return camera; }, orbit, planCtl, fitOrbit, fitPlan, setPanel, toggleMeasure, state };
+  window.__app = { THREE, scene, building, furniture, walk, setMode, addItem, renderer, measure, get camera() { return camera; }, orbit, planCtl, fitOrbit, fitPlan, setPanel, toggleMeasure,
+    toggleWallTool, selectWall, wallTool, undo, redo, switchLayout, get state() { return state; } };
 }
 boot();
