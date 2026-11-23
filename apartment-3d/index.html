@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Квартира в 3D</title>
+<meta name="description" content="3D-модель квартиры по обмерочному плану: прогулка по комнатам и расстановка мебели с реальными размерами.">
+<meta name="theme-color" content="#f6f6f3">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232b45c8'/%3E%3Cpath d='M7 25V9h10v7h8v9z' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Fira+Sans+Condensed:ital,wght@1,500;1,600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app" data-mode="orbit">
+  <canvas id="scene" aria-label="3D-модель квартиры"></canvas>
+  <div id="labels" aria-hidden="true"></div>
+
+  <header class="bar">
+    <div class="title">
+      <b>Моя квартира</b>
+      <span id="areaInfo"></span>
+    </div>
+    <nav class="modes" role="tablist" aria-label="Режим просмотра">
+      <button role="tab" data-mode="orbit" aria-selected="true">Обзор</button>
+      <button role="tab" data-mode="plan" aria-selected="false">План</button>
+      <button role="tab" data-mode="walk" aria-selected="false">Прогулка</button>
+    </nav>
+    <button class="btn primary open-panel" id="btnPanel" aria-expanded="false" aria-controls="panel">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v-3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3M3 15h18v4H3zM6 19v2M18 19v2M7 10V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3"/></svg>
+      <span>Мебель</span>
+    </button>
+  </header>
+
+  <div class="tools" role="toolbar" aria-label="Инструменты">
+    <button id="tUndo" title="Отменить (Ctrl+Z)" aria-label="Отменить"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2"/></svg></button>
+    <button id="tRedo" title="Вернуть (Ctrl+Shift+Z)" aria-label="Вернуть"><svg viewBox="0 0 24 24"><path d="m15 7 5 5-5 5M20 12H9a5 5 0 0 0 0 10h2"/></svg></button>
+    <span class="sep"></span>
+    <button id="tMeasure" aria-pressed="false" title="Рулетка (M): нажмите две точки" aria-label="Рулетка"><svg viewBox="0 0 24 24"><path d="M3 15 15 3l6 6L9 21z"/><path d="m7 11 2 2M10 8l2 2M13 5l2 2M5 14l2 2" /></svg></button>
+    <button id="tWall" aria-pressed="false" title="Обои (O): нажмите на стену и выберите обои" aria-label="Обои"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="13" height="5.5" rx="1.5"/><path d="M16.5 6.2h3.3v5.6h-8.3V15"/><rect x="10" y="15" width="3" height="6" rx="1"/></svg></button>
+    <button id="tCut" aria-pressed="true" title="Срезать стены по высоте — саму высоту можно поменять в настройках" aria-label="Срез стен"><svg viewBox="0 0 24 24"><path d="M4 20V10l8-5 8 5v10z" stroke-dasharray="2.5 2"/><path d="M2 13h20"/><path d="M4 20v-7M20 20v-7M4 20h16"/></svg></button>
+    <button id="tReset" title="Показать всю квартиру" aria-label="Показать всю квартиру"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><rect x="9" y="9" width="6" height="6"/></svg></button>
+    <button id="tFull" title="Во весь экран" aria-label="Во весь экран"><svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg></button>
+    <button id="tHelp" title="Как пользоваться" aria-label="Как пользоваться"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/></svg></button>
+  </div>
+
+  <div class="walk-hud">
+    <div class="room-chip" id="roomChip"></div>
+    <canvas id="minimap" title="Нажмите, чтобы перейти в эту точку"></canvas>
+    <div class="joystick" id="joystick" aria-label="Джойстик: идти"><div class="knob"></div></div>
+    <div class="walk-hint" id="walkHint">W A S D — идти · тянуть мышью — смотреть · Shift — быстрее</div>
+  </div>
+
+  <div class="wall-hint" id="wallHint">Обои: нажмите на стену <button class="link" id="wallHintDone">Готово</button></div>
+
+  <div class="measure-hint" id="measureHint">Рулетка: нажмите на первую точку, потом на вторую <button class="link" id="measureClear">Стереть замеры</button></div>
+
+  <section class="inspector" id="inspector" hidden aria-label="Выбранный предмет">
+    <div class="ins-head">
+      <input id="insName" class="ins-name" type="text" maxlength="60" aria-label="Название">
+      <button class="icon" id="insClose" aria-label="Снять выделение"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="ins-status" id="insStatus"></div>
+    <div class="ins-dims">
+      <label><span>Ширина</span><input type="number" inputmode="decimal" id="insW" min="1" step="1"><i>см</i></label>
+      <label><span>Глубина</span><input type="number" inputmode="decimal" id="insD" min="1" step="1"><i>см</i></label>
+      <label><span>Высота</span><input type="number" inputmode="decimal" id="insH" min="1" step="1"><i>см</i></label>
+      <label><span>От пола</span><input type="number" inputmode="decimal" id="insZ" min="0" step="1"><i>см</i></label>
+    </div>
+    <div class="ins-rot">
+      <button data-rot="-90" title="Повернуть на 90° против часовой (Shift+R)"><svg viewBox="0 0 24 24"><path d="M4 4v6h6"/><path d="M4.5 10A8 8 0 1 1 6 16"/></svg>90°</button>
+      <button data-rot="-15">−15°</button>
+      <label class="angle"><input type="number" id="insRot" step="1" aria-label="Угол поворота"><i>°</i></label>
+      <button data-rot="15">+15°</button>
+      <button data-rot="90" title="Повернуть на 90° по часовой (R)">90°<svg viewBox="0 0 24 24"><path d="M20 4v6h-6"/><path d="M19.5 10A8 8 0 1 0 18 16"/></svg></button>
+    </div>
+    <details class="ins-more">
+      <summary>Цвет и точный сдвиг</summary>
+      <div class="swatches" id="insColors"></div>
+      <div class="ins-top" id="insTopRow" hidden><span>Столешница</span><div class="swatches" id="insTop"></div></div>
+      <div class="nudge">
+        <span>Сдвинуть на</span>
+        <select id="nudgeStep" aria-label="Шаг сдвига"><option value="10">1 см</option><option value="50">5 см</option><option value="100">10 см</option></select>
+        <div class="pad">
+          <button data-nudge="up" aria-label="Дальше от камеры">↑</button>
+          <button data-nudge="left" aria-label="Влево">←</button>
+          <button data-nudge="down" aria-label="Ближе к камере">↓</button>
+          <button data-nudge="right" aria-label="Вправо">→</button>
+        </div>
+      </div>
+    </details>
+    <div class="ins-actions">
+      <button class="btn" id="insDup">Дублировать</button>
+      <button class="btn danger" id="insDel">Удалить</button>
+    </div>
+  </section>
+
+  <section class="inspector wallcard" id="wallCard" hidden aria-label="Обои на выбранной стене">
+    <div class="ins-head">
+      <div class="wc-title"><b id="wcRoom"></b><span id="wcInfo"></span></div>
+      <button class="icon" id="wcClose" aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <p class="wc-now" id="wcNow"></p>
+    <div class="covers" id="wcCovers"></div>
+    <div class="wc-color" id="wcColorRow"><span>Оттенок</span><div class="swatches" id="wcColors"></div></div>
+    <div class="wc-photo" id="wcPhotoRow" hidden>
+      <span>Ширина рисунка на фото</span>
+      <label class="unit"><input type="number" inputmode="decimal" id="wcPhotoW" min="5" max="500" step="1" aria-label="Ширина рисунка на фото, см"><i>см</i></label>
+      <button class="btn small danger" id="wcPhotoDel">Удалить фото</button>
+    </div>
+    <div class="ins-actions">
+      <button class="btn" id="wcRoomAll">На всю комнату</button>
+      <button class="btn" id="wcReset">Как было</button>
+    </div>
+  </section>
+
+  <aside class="panel" id="panel" aria-label="Мебель и настройки">
+    <div class="grip" id="panelGrip" aria-hidden="true"></div>
+    <div class="panel-head">
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="add" aria-selected="true">Добавить</button>
+        <button role="tab" data-tab="list" aria-selected="false">Расстановка <span class="count" id="itemCount"></span></button>
+        <button role="tab" data-tab="settings" aria-selected="false">Настройки</button>
+      </div>
+      <button class="icon" id="panelClose" aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+
+    <div class="tab-body" data-tab="add">
+      <div id="setCard"></div>
+      <form id="quickAdd" class="quick" autocomplete="off">
+        <h3>По размерам с ценника</h3>
+        <div class="row">
+          <input id="qaName" type="text" maxlength="60" placeholder="Название, например «Диван Осло»" aria-label="Название">
+          <select id="qaShape" aria-label="Форма"></select>
+        </div>
+        <div class="row dims">
+          <label><span>Ш</span><input id="qaW" type="number" inputmode="decimal" min="1" required><i>см</i></label>
+          <label><span>Г</span><input id="qaD" type="number" inputmode="decimal" min="1" required><i>см</i></label>
+          <label><span>В</span><input id="qaH" type="number" inputmode="decimal" min="1" required><i>см</i></label>
+        </div>
+        <button class="btn primary wide" type="submit">Добавить на план</button>
+      </form>
+      <div id="catalog"></div>
+    </div>
+
+    <div class="tab-body" data-tab="list" hidden>
+      <div class="variants">
+        <label for="layoutSel">Вариант</label>
+        <select id="layoutSel"></select>
+        <button class="btn small" id="layoutCopy" title="Сделать копию, чтобы сравнить расстановки">Копия</button>
+        <button class="btn small" id="layoutRename">Имя</button>
+        <button class="btn small" id="layoutDel">Удалить</button>
+      </div>
+      <div id="itemList"></div>
+      <div class="data">
+        <h3>Сохранить и поделиться</h3>
+        <p class="note">Расстановка хранится только в этом браузере. Чтобы перенести на телефон или отправить, скачайте файл или скопируйте ссылку.</p>
+        <div class="btns">
+          <button class="btn" id="dExport">Скачать файл</button>
+          <button class="btn" id="dLink">Скопировать ссылку</button>
+          <button class="btn" id="dCopy">Скопировать код</button>
+          <label class="btn file">Открыть файл<input type="file" id="dImport" accept=".json,application/json"></label>
+          <button class="btn" id="dPaste">Вставить код</button>
+          <button class="btn danger" id="dClear">Очистить вариант</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-body" data-tab="settings" hidden>
+      <h3>Ламинат</h3>
+      <div class="lam" id="lamList"></div>
+      <div class="field"><span>Доска</span><select id="plankSize"></select></div>
+      <div class="field"><span>Укладка</span>
+        <div class="seg" id="plankDir">
+          <button data-dir="y">Доски к окну</button>
+          <button data-dir="x">Вдоль окна</button>
+        </div>
+      </div>
+      <h3>Стены</h3>
+      <label class="check"><input type="checkbox" id="optWallpaper"> Обои: прихожая и коридор NF1009, спальня NF1007 и стена напротив кровати NF3207, гостиная — белые</label>
+      <div class="wall-btns"><button class="btn" id="wallsPick">Поменять обои на стене</button><button class="btn" id="wallsReset">Вернуть как по плану</button></div>
+      <p class="note">Обои меняются в каждом варианте отдельно: валик слева, потом нажмите на стену. Подойдёт и своё фото обоев — например, снимок образца в магазине.</p>
+      <label class="check"><input type="checkbox" id="optBaseboard"> Белый плинтус 10 см — в комнатах, прихожей и коридоре</label>
+      <div class="swatches" id="wallColors"></div>
+      <p class="note">Цвет краски — там, где нет обоев, плитки и кирпича: кухня, балкон, откосы окон.</p>
+      <div class="field"><span>Высота потолка</span><label class="unit"><input type="number" id="ceilH" min="220" max="400" step="1"><i>см</i></label></div>
+      <div class="field"><span>Высота стен в обзоре</span><div class="range"><input type="range" id="cutH" min="60" max="250" step="5" aria-label="Высота стен в обзоре, см"><output id="cutHVal" for="cutH"></output></div></div>
+      <label class="check"><input type="checkbox" id="optBrick"> Белый кирпичик на кухне (стена напротив гарнитура)</label>
+      <label class="check"><input type="checkbox" id="optApron"> Фартук на кухне — плиты под мрамор 120 × 60</label>
+      <label class="check"><input type="checkbox" id="optTile"> Плитка 60 × 30 в ванной и туалете</label>
+      <h3>Показывать</h3>
+      <label class="check"><input type="checkbox" id="optDims"> Расстояния от выбранной мебели до стен</label>
+      <label class="check"><input type="checkbox" id="optSwings"> Зоны открывания дверей</label>
+      <label class="check"><input type="checkbox" id="optDoors"> Дверные полотна</label>
+      <label class="check"><input type="checkbox" id="optLabels"> Названия и площади комнат</label>
+      <label class="check"><input type="checkbox" id="optShadows"> Тени</label>
+      <label class="check"><input type="checkbox" id="optSnap"> Прилипание к стенам и мебели</label>
+      <h3>Прогулка</h3>
+      <div class="field"><span>Глаза на высоте</span><label class="unit"><input type="number" id="eyeH" min="100" max="200" step="1"><i>см</i></label></div>
+      <label class="check"><input type="checkbox" id="optGhost"> Проходить сквозь мебель</label>
+      <p class="note">Размеры стен взяты с обмерочного плана, высота потолка 2,5 м — с развёртки душевой, плитка, кирпичик и фартук — с фото. Толщины стен на плане не подписаны и заданы примерно — их можно поправить в файле <code>js/plan.js</code>.</p>
+    </div>
+  </aside>
+
+  <div class="modal" id="modal" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 id="modalTitle"></h2>
+      <div id="modalBody"></div>
+      <div class="dialog-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
