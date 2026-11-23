@@ -83,6 +83,10 @@ export const CATALOG = [
   ] },
   { group: 'Прихожая и прочее', items: [
     { type: 'wardrobe', name: 'Шкаф в прихожую', w: 1000, d: 400, h: 2200, color: '#ebe7e0' },
+    { type: 'domenicaBench', name: 'Тумба Domenica 1D', w: 850, d: 410, h: 490, color: '#c9c2b8', color2: '#cfb48e' },
+    { type: 'domenicaHanger', name: 'Вешалка Domenica', w: 850, d: 260, h: 1330, z: 850, color: '#c9c2b8', color2: '#cfb48e' },
+    { type: 'domenicaChest', name: 'Комод Domenica 2D1S', w: 700, d: 410, h: 930, color: '#c9c2b8', color2: '#cfb48e' },
+    { type: 'domenicaMirror', name: 'Зеркало Domenica 65', w: 650, d: 260, h: 835, z: 1130, color: '#c9c2b8', color2: '#cfb48e' },
     { type: 'dresser', name: 'Обувница', w: 800, d: 300, h: 1000, color: '#e8e4dd' },
     { type: 'radiator', name: 'Радиатор', w: 800, d: 100, h: 600, z: 120, color: '#f4f4f2' },
     { type: 'aircon', name: 'Кондиционер', w: 800, d: 200, h: 280, z: 2140, color: '#f7f7f5' },
@@ -104,6 +108,7 @@ export const SHAPES = [
   ['drawerUnit', 'Тумба с ящиками'], ['shelfOpenR', 'Полки, открытые справа'], ['shelfOpenL', 'Полки, открытые слева'], ['windowTop', 'Столешница у окна'], ['drawerApron', 'Ящики под столешницу'], ['shelfFramed', 'Полки в раме'], ['cabinetDoor', 'Шкаф с дверцей'],
   ['shelfDivider', 'Стеллаж-перегородка'], ['slatPanel', 'Реечная панель'], ['soundbar', 'Саундбар'], ['turntable', 'Проигрыватель винила'], ['monitorCurved', 'Монитор изогнутый'],
   ['chairOffice', 'Офисное кресло'], ['kettleGlass', 'Чайник'], ['microwave', 'Микроволновка'],
+  ['domenicaBench', 'Тумба с нишей на ножках'], ['domenicaHanger', 'Вешалка-панель с полкой'], ['domenicaChest', 'Комод с ящиком на ножках'], ['domenicaMirror', 'Зеркало на панели с полкой'],
 ];
 
 export const SWATCHES = ['#ebe7e0', '#f4ede3', '#a6c6b9', '#d9cfc2', '#b08d68', '#7a5a3f', '#8b9098', '#4f5560', '#2d2e30', '#9db2c6', '#5f7a8c', '#a3ae97', '#c98f7a', '#e2c36f'];
@@ -152,6 +157,10 @@ const ICON = {
   toilet: '<rect x="14" y="5" width="16" height="9" rx="1"/><ellipse cx="22" cy="26" rx="7" ry="11"/>',
   boiler: '<circle cx="22" cy="22" r="12"/><path d="M22 14v16"/>',
   chairOffice: '<rect x="14" y="16" width="16" height="15" rx="4"/><path d="M13 13q9-5 18 0M11 18v10M33 18v10"/>',
+  domenicaBench: '<rect x="5" y="15" width="34" height="14"/><path d="M18 15v14M21 22h0M26 22h13"/>',
+  domenicaHanger: '<rect x="12" y="6" width="20" height="32"/><path d="M22 10h10M16 20v3M22 23v3M28 23v3"/>',
+  domenicaChest: '<rect x="9" y="8" width="26" height="28"/><path d="M23 8v28M9 14h14M27 12v24"/>',
+  domenicaMirror: '<rect x="10" y="8" width="17" height="24"/><path d="M27 6h7v26M8 34h28"/>',
   kettleGlass: '<circle cx="20" cy="22" r="9"/><path d="M29 18h5v8h-5M11 22H7"/>',
   microwave: '<rect x="7" y="13" width="30" height="18" rx="1.5"/><path d="M29 13v18"/><circle cx="33" cy="18" r="1.4"/><circle cx="33" cy="26" r="1.4"/>',
   radiator: '<rect x="6" y="18" width="32" height="8"/><path d="M11 18v8M16 18v8M21 18v8M26 18v8M31 18v8"/>',
@@ -351,6 +360,68 @@ function softSlab(g, w, d, h, x, y0, z, r, b, m) {
   mesh.castShadow = true; mesh.receiveShadow = true;
   g.add(mesh);
   return mesh;
+}
+
+// ── Коллекция Domenica (BRW): светло-серый корпус, фасады с вертикальными рейками, верх и полки под дуб,
+// ручки-кольца, чёрные металлические ножки и крючки ──
+// панель с рейками: передняя сторона — полукруглые рейки с шагом pitch; (x, y, z) — центр панели, t — толщина
+function fluted(g, w, h, t, x, y, z, m, pitch = 0.02, amp = 0.0032) {
+  const n = Math.max(2, Math.round(w / pitch)), p = w / n, s = new THREE.Shape();
+  s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(w / 2, t - amp);
+  for (let i = n - 1; i >= 0; i--) { const x0 = -w / 2 + i * p; s.quadraticCurveTo(x0 + p / 2, t + amp, x0, t - amp); }
+  s.lineTo(-w / 2, 0);
+  const geo = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 4 });
+  geo.rotateX(Math.PI / 2); geo.translate(0, h, 0);   // выдавливание — вверх, толщина — вперёд (+Z)
+  const mesh = new THREE.Mesh(geo, m);
+  mesh.position.set(x, y - h / 2, z - t / 2);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  g.add(mesh);
+  return mesh;
+}
+// ручка-кольцо на фасаде: тёмное кольцо на круглой накладке
+function ringHandle(g, x, y, zf) {
+  const dark = mat('#2a2a2b', 0.35, 0.6);
+  const plate = C(g, 0.011, 0.011, 0.006, x, y, zf + 0.003, dark, 16); plate.rotation.x = Math.PI / 2; plate.castShadow = false;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.0028, 8, 24), dark);
+  ring.position.set(x, y - 0.006, zf + 0.009);
+  g.add(ring);
+}
+// зеркало: светлое стекло с мягким градиентом и косым бликом — без настоящих отражений, но и не тёмный «экран»
+let mirrorMatCache = null;
+function mirrorMat() {
+  if (mirrorMatCache) return mirrorMatCache;
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256;
+  const ctx = cv.getContext('2d');
+  const gr = ctx.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, '#eef2f3'); gr.addColorStop(0.5, '#d3dade'); gr.addColorStop(1, '#b4bec3');
+  ctx.fillStyle = gr; ctx.fillRect(0, 0, 128, 256);
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.beginPath(); ctx.moveTo(10, 256); ctx.lineTo(60, 256); ctx.lineTo(128, 120); ctx.lineTo(128, 40); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.moveTo(72, 256); ctx.lineTo(84, 256); ctx.lineTo(128, 168); ctx.lineTo(128, 144); ctx.closePath(); ctx.fill();
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  mirrorMatCache = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.1, metalness: 0.15 });
+  return mirrorMatCache;
+}
+// чёрный крючок: накладка на стене и рожок вперёд-вверх с шариком на конце
+function coatHook(g, x, y, zb) {
+  const black = mat('#1b1c1d', 0.45, 0.4);
+  B(g, 0.014, 0.045, 0.006, x, y, zb + 0.003, black, false);
+  const arm = C(g, 0.0035, 0.0035, 0.06, x, y - 0.008, zb + 0.032, black, 10);
+  arm.rotation.x = Math.PI / 2 - 0.45;
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.006, 10, 8), black);
+  tip.position.set(x, y + 0.004, zb + 0.058);
+  g.add(tip);
+}
+// тонкие чёрные металлические ножки: по углам и, если корпус широкий, посередине
+function slimLegs(g, W, D, h) {
+  const black = mat('#1b1c1d', 0.45, 0.4), xs = W > 0.8 ? [-1, 0, 1] : [-1, 1];
+  for (const sx of xs) for (const sz of [-1, 1]) {
+    const x = sx * (W / 2 - 0.035), z = sz * (D / 2 - 0.05);
+    B(g, 0.018, h, 0.035, x, h / 2, z, black);
+  }
+  for (const sz of [-1, 1]) B(g, W - 0.06, 0.012, 0.02, 0, h - 0.006, sz * (D / 2 - 0.05), black);
 }
 
 // коробка по границам (x0..x1, y0..y1, z0..z1)
@@ -1197,6 +1268,67 @@ const BUILD = {
     const needle = B(g, 0.004, 0.05, 0.002, 0, ty, r + 0.0095, mat('#d23a2a', 0.5), false);
     needle.rotation.z = 0.6;
   },
+  // тумба Domenica 1D (85 × 49 × 41, по фото): слева дверца с рейками и ручкой-кольцом, справа открытая ниша
+  // с полкой, верх под дуб, на чёрных ножках. Цвет предмета — корпус, второй цвет — верх
+  domenicaBench(g, W, D, H, c, it) {
+    const body = mat(c, 0.7), t = 0.018, topT = 0.018, legH = Math.min(0.08, H * 0.16);
+    const y0 = legH, y1 = H - topT, ch = y1 - y0, zf = D / 2;
+    slimLegs(g, W, D, legH);
+    WB(g, W, topT, D, 0, H - topT / 2, 0, (it && it.color2) || '#cfb48e');
+    B(g, t, ch, D, -W / 2 + t / 2, y0 + ch / 2, 0, body);
+    B(g, t, ch, D, W / 2 - t / 2, y0 + ch / 2, 0, body);
+    B(g, W - 2 * t, t, D - 0.02, 0, y0 + t / 2, -0.01, body);
+    B(g, W - 2 * t, ch, 0.008, 0, y0 + ch / 2, -D / 2 + 0.004, body);
+    const doorW = W * 0.41, xs = -W / 2 + doorW;                         // перегородка у края дверцы
+    B(g, t, ch, D - 0.02, xs, y0 + ch / 2, -0.01, body);
+    const nw = W / 2 - t - (xs + t / 2);                                  // открытая ниша справа: полка посередине
+    B(g, nw, t, D - 0.03, xs + t / 2 + nw / 2, y0 + ch / 2, -0.015, body);
+    fluted(g, doorW - 0.004, ch - 0.004, t, -W / 2 + doorW / 2, y0 + ch / 2, zf - t / 2, body);
+    ringHandle(g, -W / 2 + doorW - 0.035, y1 - 0.045, zf);
+  },
+  // комод Domenica 2D1S (70 × 93 × 41): слева ящик и под ним гладкая дверца, справа высокая дверца с рейками,
+  // ручки-кольца, верх под дуб, чёрные ножки
+  domenicaChest(g, W, D, H, c, it) {
+    const body = mat(c, 0.7), t = 0.018, topT = 0.018, legH = Math.min(0.08, H * 0.09);
+    const y0 = legH, y1 = H - topT, ch = y1 - y0, zf = D / 2, gap = 0.003;
+    slimLegs(g, W, D, legH);
+    WB(g, W, topT, D, 0, H - topT / 2, 0, (it && it.color2) || '#cfb48e');
+    B(g, W, ch, D - t, 0, y0 + ch / 2, -t / 2, body);                      // корпус
+    const lw = W * 0.55, rw = W - lw, drH = ch * 0.19;
+    const lx = -W / 2 + lw / 2, rx = W / 2 - rw / 2;
+    B(g, lw - gap, drH - gap, t, lx, y1 - drH / 2, zf - t / 2, body);      // ящик
+    ringHandle(g, lx, y1 - drH / 2 + 0.006, zf);
+    B(g, lw - gap, ch - drH - gap, t, lx, y0 + (ch - drH) / 2, zf - t / 2, body);   // дверца под ящиком
+    ringHandle(g, -W / 2 + lw - 0.04, y1 - drH - 0.05, zf);
+    fluted(g, rw - gap, ch - gap, t, rx, y0 + ch / 2, zf - t / 2, body);   // высокая дверца с рейками
+    ringHandle(g, W / 2 - rw + 0.04, y1 - 0.05, zf);
+    B(g, gap, ch, 0.004, -W / 2 + lw, y0 + ch / 2, zf - t - 0.001, mat('#8f8a84', 0.8), false);
+  },
+  // вешалка Domenica (85 × 133 × 26): панель с рейками во всю высоту, справа вверху полка под дуб
+  // со штангой снизу, чёрные крючки — один выше слева и три в ряд посередине. Глубина предмета — по полке
+  domenicaHanger(g, W, D, H, c, it) {
+    const body = mat(c, 0.7), t = 0.018, zb = -D / 2, black = mat('#1b1c1d', 0.45, 0.4);
+    fluted(g, W, H, t, 0, H / 2, zb + t / 2, body);
+    const sw = W * 0.5, sy = H - Math.min(0.14, H * 0.1), sx = W / 2 - sw / 2;
+    WB(g, sw, 0.022, D - t, sx, sy, zb + t + (D - t) / 2, (it && it.color2) || '#cfb48e');
+    const rodZ = zb + t + (D - t) * 0.62, rodY = sy - 0.06;
+    const rod = C(g, 0.008, 0.008, sw - 0.06, sx, rodY, rodZ, black, 12); rod.rotation.z = Math.PI / 2;
+    for (const k of [-1, 1]) C(g, 0.004, 0.004, 0.05, sx + k * (sw / 2 - 0.05), rodY + 0.03, rodZ, black, 8);
+    const zh = zb + t;
+    coatHook(g, -W / 2 + 0.12, H * 0.72, zh);
+    for (const x of [-W / 2 + 0.12, 0.05, W / 2 - 0.17]) coatHook(g, x, H * 0.52, zh);
+  },
+  // зеркало Domenica 65 (65 × 83,5 × 26): прямоугольное зеркало на светлой подложке, справа за ним — панель
+  // с рейками выше зеркала, внизу полка под дуб во всю ширину
+  domenicaMirror(g, W, D, H, c, it) {
+    const body = mat(c, 0.7), t = 0.018, zb = -D / 2, shT = 0.022;
+    WB(g, W, shT, D, 0, shT / 2, 0, (it && it.color2) || '#cfb48e');
+    const pw = W * 0.35, px = W / 2 - 0.04 - pw / 2;
+    fluted(g, pw, H - shT, t, px, shT + (H - shT) / 2, zb + t / 2, body);
+    const mw = W * 0.72, mh = (H - shT) * 0.86, mx = -W / 2 + mw / 2, my = shT + mh / 2;
+    B(g, mw, mh, 0.016, mx, my, zb + t + 0.008, body);                    // подложка
+    B(g, mw - 0.01, mh - 0.01, 0.004, mx, my, zb + t + 0.018, mirrorMat(), false);              // зеркало
+  },
   // офисное кресло по фото: пятилучевая крестовина на роликах, газлифт, сиденье, изогнутая сетчатая спинка,
   // подлокотники на стойках. Выше 1,1 м — подголовник и поясничный упор (первое фото), иначе спинка ниже (второе)
   chairOffice(g, W, D, H, c) {
@@ -1339,7 +1471,7 @@ export function buildModel(item) {
 // мелочи на мебели (техника): с мебелью под собой и рядом не конфликтуют
 export const ACCESSORY = new Set(['soundbar', 'turntable', 'monitorCurved']);
 
-export const HAS_TOP = new Set(['kitchenBase', 'sink', 'kitchenDrawers', 'kitchenOven', 'kitchenCorner', 'tvUnit']);
+export const HAS_TOP = new Set(['kitchenBase', 'sink', 'kitchenDrawers', 'kitchenOven', 'kitchenCorner', 'tvUnit', 'domenicaBench', 'domenicaChest', 'domenicaHanger', 'domenicaMirror']);
 export const TOP_SWATCHES = [['#a27c58', 'Дерево'], ['#c9a77f', 'Светлый дуб'], ['#6f4d36', 'Орех'], ['#ebe7df', 'Белый камень'], ['#b8b4ac', 'Серый камень'], ['#2e2f31', 'Чёрный']];
 
 export function shapeName(type) {

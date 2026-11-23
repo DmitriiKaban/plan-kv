@@ -133,10 +133,11 @@ export function diningItems() {
 export const AC_SET = 'aircon-v1';
 export function airconItems() {
   const w = 800, d = 200, h = 280;
-  const y0 = Y.hall0, y1 = Y.liv1 - M.livingDoorFromBottom - M.livingDoor;   // от угла спальни до двери в гостиную
+  // место отмечено на снимке: середина в 46,5 см от угла спальни. Дверь в гостиную потом передвинули
+  // ближе к нему (на 67 см от нижней стены) — сам кондиционер остался где был, над дверью он не мешает
   return [
     { set: AC_SET, type: 'aircon', name: 'Кондиционер', w, d, h, z: M.ceiling - 80 - h, rot: 270,
-      x: X.bed0 + d / 2, y: Math.round((y0 + y1) / 2), color: '#f7f7f5' },
+      x: X.bed0 + d / 2, y: Y.hall0 + 465, color: '#f7f7f5' },
   ];
 }
 
@@ -310,4 +311,23 @@ export function applianceItems(current) {
     out.push({ set: APPL_SET, type: 'microwave', name: 'Микроволновка Samsung 20 л', w: mw, d: md, h: 259, z: top(corner), rot: corner.rot, x, y, color: '#f4f4f2' });
   }
   return out;
+}
+
+// ── Прихожая: коллекция Domenica (BRW), по ссылкам на mobvaro.md. Справа от входа, вдоль стены:
+// сначала тумба 1D (85 × 49 × 41), над ней повыше вешалка с крючками (85 × 133 × 26),
+// дальше комод 2D1S (70 × 93 × 41), над ним зеркало 65 (65 × 83,5 × 26).
+// Тумба и комод — в 2 см от стены (там плинтус) и в 2 см друг от друга; вешалка и зеркало висят на стене.
+// Высоту вешалки и зеркала не называли: низ вешалки на 85 см (35 см над тумбой, крючки на 1,5–1,8 м),
+// низ зеркала с полкой на 1,13 м (20 см над комодом)
+export const HALL_SET = 'hall-v1';
+export function hallItems() {
+  const set = HALL_SET, rot = 90, color = '#c9c2b8', color2 = '#cfb48e';
+  const wall = X.hallR, gap = 20, d = 410, xb = wall - gap - d / 2;
+  const yBench = Y.liv1 - 10 - 850 / 2, yChest = yBench - 850 / 2 - gap - 700 / 2;
+  return [
+    { set, type: 'domenicaBench', name: 'Тумба Domenica 1D', w: 850, d, h: 490, z: 0, rot, x: xb, y: yBench, color, color2 },
+    { set, type: 'domenicaHanger', name: 'Вешалка Domenica', w: 850, d: 260, h: 1330, z: 850, rot, x: wall - 130, y: yBench, color, color2 },
+    { set, type: 'domenicaChest', name: 'Комод Domenica 2D1S', w: 700, d, h: 930, z: 0, rot, x: xb, y: yChest, color, color2 },
+    { set, type: 'domenicaMirror', name: 'Зеркало Domenica 65', w: 650, d: 260, h: 835, z: 1130, rot, x: wall - 130, y: yChest, color, color2 },
+  ];
 }

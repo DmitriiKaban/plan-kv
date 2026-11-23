@@ -9,7 +9,7 @@ import { bathItems, BATH_SET, BATH_OLD } from './bathroom.js';
 import { wcItems, WC_SET, heatingItems, HEAT_SET, bedroomItems, BED_SET, BED_KEEP, BED_ADD, livingItems, LIVING_SET, LIVING_OLD, LIVING_KEEP, LIVING_SINCE, livingDrop, livingFix,
   diningItems, DINING_SET, DINING_KEEP, diningFix, airconItems, AC_SET, tvwallItems, TVWALL_SET, TVWALL_KEEP, TVWALL_DROP, TVWALL_ADD,
   mediaItems, MEDIA_SET, MEDIA_KEEP, mediaDrop, MEDIA_SINCE, studyItems, STUDY_SET, STUDY_OLD,
-  chairItems, CHAIRS_SET, boilerItems, BOILER_SET, applianceItems, APPL_SET } from './sets.js';
+  chairItems, CHAIRS_SET, boilerItems, BOILER_SET, applianceItems, APPL_SET, hallItems, HALL_SET } from './sets.js';
 import { Furniture, newId } from './furniture.js';
 import { WalkControls, attachJoystick } from './walk.js';
 import { Labels, Measure, Minimap } from './overlay.js';
@@ -67,6 +67,7 @@ const SETS = [
   { id: CHAIRS_SET, old: [], title: 'Стулья к столам', items: chairItems },
   { id: BOILER_SET, old: [], title: 'Бойлер', items: boilerItems },
   { id: APPL_SET, old: [], title: 'Техника на кухне', items: applianceItems },
+  { id: HALL_SET, old: [], title: 'Прихожая', items: hallItems },
 ];
 state.sets = state.sets || {};
 const vnum = (id) => +(String(id || '').match(/-v(\d+)$/) || [0, 0])[1];   // номер версии набора: 'living-v3' → 3
@@ -653,6 +654,7 @@ function renderSetCard() {
     [CHAIRS_SET]: { sw: ['#1d1e20', '#3a3c3f', '#9a9ea3'], text: 'Кресло с подголовником — за рабочий стол в гостиной, компьютерный стул — к столу у окна в спальне' },
     [BOILER_SET]: { sw: ['#f4f4f2', '#dfe1e2', '#4fb6ff'], text: '⌀38,5 × 77 на стене за унитазом, низ на 1,45 м' },
     [APPL_SET]: { sw: ['#c3c7cb', '#f4f4f2', '#111214'], text: 'Чайник слева от плиты, микроволновка на угловой столешнице у холодильника' },
+    [HALL_SET]: { sw: ['#c9c2b8', '#cfb48e', '#1b1c1d'], text: 'Domenica справа от входа: тумба 1D и вешалка над ней, комод 2D1S и зеркало над ним' },
   };
   $('#setCard').innerHTML = `<h3>Расставлено по твоим описаниям</h3>` + SETS.map((set, i) => {
     const c = info[set.id] || { sw: ['#eee', '#ddd', '#ccc'], text: '' };
