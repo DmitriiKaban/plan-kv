@@ -108,11 +108,12 @@ code { font-size: .92em; background: var(--paper-2); padding: 1px 4px; border-ra
 .set-card .btn { height: 32px; padding: 0 12px; font-size: 13px; }
 #setCard h3 { margin-top: 2px; }
 .ins-top { display: flex; align-items: center; gap: 10px; margin: -2px 0 10px; font-size: 13px; color: var(--ink-2); }
-.ins-var { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 13px; color: var(--ink-2); }
-.ins-var .seg { display: flex; flex-wrap: wrap; gap: 4px; }
-.ins-var .seg button { flex: none; white-space: nowrap; height: 30px; padding: 0 11px; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
-.ins-var .seg button[aria-pressed="true"] { background: var(--blue-2); border-color: var(--blue); color: var(--blue); font-weight: 600; }
-.ins-var .seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.ins-var { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 10px; font-size: 13px; color: var(--ink-2); }
+.ins-var > span { flex: none; line-height: 30px; }
+.ins-var .pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.ins-var .pills button { flex: none; white-space: nowrap; height: 30px; padding: 0 11px; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
+.ins-var .pills button[aria-pressed="true"] { background: var(--blue-2); border-color: var(--blue); color: var(--blue); font-weight: 600; }
+.ins-var .pills button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 .quick { padding: 6px 0 14px; border-bottom: 1px solid var(--line); }
 .quick .row { display: flex; gap: 6px; margin-top: 6px; }
 .quick input[type="text"] { flex: 1.4; }

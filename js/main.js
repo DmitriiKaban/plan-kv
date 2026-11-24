@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { PLAN } from './plan.js';
 import { Building } from './building.js';
-import { CATALOG, SHAPES, SWATCHES, HAS_TOP, TOP_SWATCHES, iconSvg, shapeName, variantsOf } from './catalog.js';
+import { CATALOG, SHAPES, SWATCHES, HAS_TOP, topOptions, iconSvg, shapeName, variantsOf } from './catalog.js';
 import { kitchenItems, kitchenApron, KITCHEN_SET, KITCHEN_OLD, KITCHEN_H, KITCHEN_RUN, KITCHEN_WALL } from './kitchen.js';
 import { bathItems, BATH_SET, BATH_OLD } from './bathroom.js';
 import { wcItems, WC_SET, heatingItems, HEAT_SET, bedroomItems, BED_SET, BED_KEEP, BED_ADD, livingItems, LIVING_SET, LIVING_OLD, LIVING_KEEP, LIVING_SINCE, livingDrop, livingFix,
@@ -542,13 +542,24 @@ function fillInspector(it = furniture.selected, force = false) {
   $('#insStatus').innerHTML = `${esc(room ? room.name : 'Вне комнат')}, ${dimsTxt(it)} см` +
     msgs.map((m) => `<span class="${m.kind === 'door' ? 'door' : 'bad'}">${esc(cap(m.text))}</span>`).join('');
   $$('#insColors button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === it.color)));
+  const top = topOptions(it.type);
   $('#insTopRow').hidden = !HAS_TOP.has(it.type);
+  $('#insTopLabel').textContent = top.label;
+  renderTops(top);
   // вид предмета (например, стеллаж: по чертежу, зеркально, ровные полки)
   const vars = variantsOf(it.type);
   $('#insVarRow').hidden = !vars;
   if (vars) $('#insVar').innerHTML = vars.map(([t, n, hint]) => `<button data-t="${t}" title="${esc(hint || n)}" aria-pressed="${t === it.type}">${esc(n)}</button>`).join('');
-  $$('#insTop button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === (it.color2 || '#cfc6b8'))));
+  $$('#insTop button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === (it.color2 || top.def))));
   const ci = $('#insColors input'); if (ci && document.activeElement !== ci) ci.value = it.color;
+}
+
+// кружки второго цвета: свои у каждого вида второго цвета (столешница, белые части стеллажа)
+let topsShown = null;
+function renderTops(o) {
+  if (topsShown === o) return;
+  topsShown = o;
+  $('#insTop').innerHTML = o.swatches.map(([c, n]) => `<button data-c="${c}" style="background:${c}" title="${n}" aria-label="${o.label}: ${n}"></button>`).join('');
 }
 
 function bindInspector() {
@@ -579,8 +590,8 @@ function bindInspector() {
   colors.innerHTML = SWATCHES.map((c) => `<button data-c="${c}" style="background:${c}" aria-label="Цвет ${c}"></button>`).join('') + '<input type="color" aria-label="Свой цвет">';
   colors.addEventListener('click', (e) => { const b = e.target.closest('button'); const it = sel(); if (b && it) furniture.update(it.id, { color: b.dataset.c }); furniture.reselect(); });
   const tops = $('#insTop');
-  tops.innerHTML = TOP_SWATCHES.map(([c, n]) => `<button data-c="${c}" style="background:${c}" title="${n}" aria-label="Столешница: ${n}"></button>`).join('');
-  tops.addEventListener('click', (e) => { const b = e.target.closest('button'); const it = sel(); if (b && it) furniture.update(it.id, { color2: b.dataset.c }); });
+  renderTops(topOptions(''));
+  tops.addEventListener('click', (e) => { const b = e.target.closest('button'); const it = sel(); if (b && it) { furniture.update(it.id, { color2: b.dataset.c }); furniture.reselect(); } });
   $('#insVar').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-t]'), it = sel();
     if (!b || !it || b.dataset.t === it.type) return;

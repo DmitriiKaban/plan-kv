@@ -107,7 +107,7 @@ export const SHAPES = [
   ['tableSquare', 'Стол квадратный'], ['sconceBalls', 'Бра с шариками'], ['sconceDrum', 'Бра с абажуром'], ['aircon', 'Кондиционер'],
   ['tvUnit', 'ТВ-тумба с нишей'], ['shelfOpen', 'Открытые полки'], ['cabinetTall', 'Шкаф с ручками-кнопками'],
   ['drawerUnit', 'Тумба с ящиками'], ['shelfOpenR', 'Полки, открытые справа'], ['shelfOpenL', 'Полки, открытые слева'], ['windowTop', 'Столешница у окна'], ['drawerApron', 'Ящики под столешницу'], ['shelfFramed', 'Полки в раме'], ['cabinetDoor', 'Шкаф с дверцей'],
-  ['shelfDividerGrid', 'Стеллаж по чертежу'], ['shelfDividerGridM', 'Стеллаж по чертежу, зеркально'], ['shelfDivider', 'Стеллаж-перегородка'], ['slatPanel', 'Реечная панель'], ['soundbar', 'Саундбар'], ['turntable', 'Проигрыватель винила'], ['monitorCurved', 'Монитор изогнутый'],
+  ['shelfDividerGrid', 'Стеллаж по чертежу'], ['shelfDividerGridM', 'Стеллаж по чертежу, зеркально'], ['shelfDividerGridW', 'Стеллаж по чертежу, белые ячейки'], ['shelfDividerGridF', 'Стеллаж по чертежу, белый каркас'], ['shelfDivider', 'Стеллаж-перегородка'], ['slatPanel', 'Реечная панель'], ['soundbar', 'Саундбар'], ['turntable', 'Проигрыватель винила'], ['monitorCurved', 'Монитор изогнутый'],
   ['chairOffice', 'Офисное кресло'], ['kettleGlass', 'Чайник'], ['microwave', 'Микроволновка'],
   ['domenicaBench', 'Тумба с нишей на ножках'], ['domenicaHanger', 'Вешалка-панель с полкой'], ['domenicaChest', 'Комод с ящиком на ножках'], ['domenicaMirror', 'Зеркало на панели с полкой'],
 ];
@@ -176,6 +176,8 @@ const ICON = {
   shelfDivider: '<rect x="16" y="4" width="12" height="36"/><path d="M16 22h12"/>',
   shelfDividerGrid: '<rect x="12" y="4" width="20" height="36"/><path d="M22 4v36M12 12h20M12 18h20M12 24h20M12 32h20"/>',
   shelfDividerGridM: '<rect x="12" y="4" width="20" height="36"/><path d="M22 4v36M12 12h20M12 18h20M12 24h20M12 32h20"/>',
+  shelfDividerGridW: '<rect x="12" y="4" width="20" height="36"/><path d="M22 4v36M12 12h20M12 18h20M12 24h20M12 32h20"/>',
+  shelfDividerGridF: '<rect x="12" y="4" width="20" height="36"/><path d="M22 4v36M12 12h20M12 18h20M12 24h20M12 32h20"/>',
   drawerUnit: '<rect x="10" y="8" width="24" height="28"/><path d="M10 31h24M14 33h16"/>',
   windowTop: '<rect x="3" y="12" width="38" height="20"/><path d="M15 15h14M15 17h14"/>',
   drawerApron: '<rect x="5" y="14" width="34" height="16" stroke-dasharray="3 2"/><path d="M22 14v16M7 27h13M24 27h13"/>',
@@ -433,21 +435,32 @@ const GRID_ROWS = [518, 309, 450, 300, 300, 424];
 // какие ячейки закрыты со стороны телевизора: ряды снизу вверх, [у стены, со стороны комнаты].
 // На чертеже левая колонка — у стены: так стеллаж выглядит со стороны телевизора
 const GRID_CLOSED = [[1, 1], [0, 0], [1, 0], [0, 0], [0, 1], [0, 0]];
-function gridDivider(g, W, D, H, c, mirror) {
+// style: '' — всё основного цвета; 'cells' — закрытые ячейки белые вместе со стенками;
+// 'frame' — белые стойки и верхняя доска. Белый — второй цвет предмета (color2), по умолчанию WHITE
+function gridDivider(g, W, D, H, c, it, mirror, style = '') {
   const rows = GRID_ROWS.map((v) => v / 1000), sum = rows.reduce((a, b) => a + b, 0), n = rows.length + 1;
   let t = (H - sum) / n, k = 1;
   if (t < 0.012 || t > 0.025) { t = Math.min(0.025, Math.max(0.012, t)); k = (H - n * t) / sum; }
-  const cw = (D - 3 * t) / 2, back = 0.012;
-  for (const z of [-D / 2 + t / 2, 0, D / 2 - t / 2]) WB(g, W, H, t, 0, H / 2, z, c);    // стойки: у стены, посередине, у комнаты
+  const cw = (D - 3 * t) / 2, back = 0.012, frame = style === 'frame', cells = style === 'cells';
+  const paint = mat((it && it.color2) || WHITE, 0.6);
+  const part = (w, h, d, x, y, z, white) => (white ? B(g, w, h, d, x, y, z, paint) : WB(g, w, h, d, x, y, z, c));
+  const zc = (col) => (col ? 1 : -1) * (t / 2 + cw / 2);                                 // середина колонки: 0 — у стены
+  // стойки до крышки, крышка на всю длину сверху, дно и полки — между стойками: детали не заходят друг в друга
+  for (const z of [-D / 2 + t / 2, 0, D / 2 - t / 2]) part(W, H - t, t, 0, (H - t) / 2, z, frame);
+  part(W, t, D, 0, H - t / 2, 0, frame);
   let y = 0;
-  for (let i = 0; i < n; i++) {
-    WB(g, W, t, D - 2 * t, 0, y + t / 2, 0, c);                                          // дно, полки, крышка
-    if (i === rows.length) break;
+  for (let i = 0; i < rows.length; i++) {
+    for (let col = 0; col < 2; col++) part(W, t, cw, 0, y + t / 2, zc(col), false);    // дно и полки
     const rh = rows[i] * k, y0 = y + t;
     for (let col = 0; col < 2; col++) {
       if (!GRID_CLOSED[i][mirror ? 1 - col : col]) continue;
-      const zc = col === 0 ? -D / 2 + t + cw / 2 : D / 2 - t - cw / 2;
-      WB(g, back, rh, cw, -W / 2 + back / 2, y0 + rh / 2, zc, c);                        // стенка со стороны телевизора
+      part(back, rh, cw, -W / 2 + back / 2, y0 + rh / 2, zc(col), cells);                 // стенка со стороны телевизора
+      if (!cells) continue;
+      // белая ячейка: дно, потолок и бока изнутри облицованы до переднего края, торцы досок остаются цвета стеллажа
+      const l = 0.002, dw = W - back, xc = -W / 2 + back + dw / 2;
+      B(g, dw, l, cw, xc, y0 + l / 2, zc(col), paint);
+      B(g, dw, l, cw, xc, y0 + rh - l / 2, zc(col), paint);
+      for (const s of [-1, 1]) B(g, dw, rh - 2 * l, l, xc, y0 + rh / 2, zc(col) + s * (cw / 2 - l / 2), paint);
     }
     y = y0 + rh;
   }
@@ -457,7 +470,9 @@ function gridDivider(g, W, D, H, c, mirror) {
 export const VARIANTS = [
   [['shelfDividerGrid', 'По чертежу', 'Полки по чертежу: часть ячеек закрыта со стороны телевизора'],
    ['shelfDividerGridM', 'Зеркально', 'То же, но колонки наоборот: у стены ↔ со стороны комнаты'],
-   ['shelfDivider', 'Ровные', 'Ровные полки без стенок, как было раньше']],
+   ['shelfDivider', 'Ровные', 'Ровные полки без стенок, как было раньше'],
+   ['shelfDividerGridW', 'Белые ячейки', 'По чертежу, закрытые ячейки белые вместе со стенками'],
+   ['shelfDividerGridF', 'Белый каркас', 'По чертежу, стойки и верхняя доска белые']],
 ];
 export const variantsOf = (type) => VARIANTS.find((v) => v.some(([t]) => t === type)) || null;
 
@@ -843,8 +858,10 @@ const BUILD = {
   // стеллаж по чертежу хозяина (вид со стороны телевизора, стена слева): две колонки по 850 / 2, шесть рядов,
   // просветы снизу 518, 309, 450, 300, 300, 424 мм. Часть ячеек закрыта стенкой со стороны телевизора (−X),
   // со стороны компьютера (+X) открыты все. Зеркально — колонки наоборот (у стены ↔ со стороны комнаты)
-  shelfDividerGrid(g, W, D, H, c) { gridDivider(g, W, D, H, c, false); },
-  shelfDividerGridM(g, W, D, H, c) { gridDivider(g, W, D, H, c, true); },
+  shelfDividerGrid(g, W, D, H, c, it) { gridDivider(g, W, D, H, c, it, false); },
+  shelfDividerGridM(g, W, D, H, c, it) { gridDivider(g, W, D, H, c, it, true); },
+  shelfDividerGridW(g, W, D, H, c, it) { gridDivider(g, W, D, H, c, it, false, 'cells'); },
+  shelfDividerGridF(g, W, D, H, c, it) { gridDivider(g, W, D, H, c, it, false, 'frame'); },
 
   shelfDivider(g, W, D, H, c) {
     // стеллаж-перегородка: открыт с обеих сторон; торцевые стойки (у стены и со стороны комнаты),
@@ -1514,8 +1531,14 @@ export function buildModel(item) {
 // мелочи на мебели (техника): с мебелью под собой и рядом не конфликтуют
 export const ACCESSORY = new Set(['soundbar', 'turntable', 'monitorCurved']);
 
-export const HAS_TOP = new Set(['kitchenBase', 'sink', 'kitchenDrawers', 'kitchenOven', 'kitchenCorner', 'tvUnit', 'domenicaBench', 'domenicaChest', 'domenicaHanger', 'domenicaMirror']);
+export const HAS_TOP = new Set(['kitchenBase', 'sink', 'kitchenDrawers', 'kitchenOven', 'kitchenCorner', 'tvUnit', 'domenicaBench', 'domenicaChest', 'domenicaHanger', 'domenicaMirror', 'shelfDividerGridW', 'shelfDividerGridF']);
 export const TOP_SWATCHES = [['#a27c58', 'Дерево'], ['#c9a77f', 'Светлый дуб'], ['#6f4d36', 'Орех'], ['#ebe7df', 'Белый камень'], ['#b8b4ac', 'Серый камень'], ['#2e2f31', 'Чёрный']];
+// второй цвет: у кухни и тумб это столешница, у стеллажа с белыми частями — цвет этих частей
+const TOP_PLAIN = { label: 'Столешница', def: '#cfc6b8', swatches: TOP_SWATCHES };
+const SHELF_ACCENT = { label: 'Второй цвет', def: WHITE,
+  swatches: [[WHITE, 'Белый'], ['#ebe5d8', 'Молочный'], ['#c9a77f', 'Светлый дуб'], ['#b8b4ac', 'Серый'], ['#2e2f31', 'Чёрный']] };
+const TOP_BY_TYPE = { shelfDividerGridW: SHELF_ACCENT, shelfDividerGridF: SHELF_ACCENT };
+export const topOptions = (type) => TOP_BY_TYPE[type] || TOP_PLAIN;
 
 export function shapeName(type) {
   return (SHAPES.find((s) => s[0] === type) || [type, type])[1];
