@@ -176,13 +176,16 @@ export function tvwallItems(current) {
 // · монитор AOC CU34V5CW (80,8 × 25 × 41–54 см) на рабочем столе.
 // current — предметы варианта: всё ставится возле стола, тумбы и полок там, где они стоят сейчас;
 // если чего-то из них в варианте нет, то, что на нём стоит, не добавляется.
-export const MEDIA_SET = 'media-v4';
-export const MEDIA_KEEP = ['media-v1', 'media-v2', 'media-v3'];
+export const MEDIA_SET = 'media-v5';
+export const MEDIA_KEEP = ['media-v1', 'media-v2', 'media-v3', 'media-v4'];
 // из v1 и v2: стеллаж (стал 35) встаёт заново между столом и тумбой, монитор — по центру укороченного стола,
 // проигрыватель из v1 — по центру расширенных полок. Из v3 всё остаётся на месте, у стеллажа меняются полки —
-// по чертежу хозяина (ряды 518, 309, 450, 300, 300, 424, часть ячеек закрыта со стороны телевизора)
-export const mediaDrop = (it) => it.set !== 'media-v3' && (it.type === 'shelfDivider' || it.type === 'monitorCurved' || (it.set === 'media-v1' && it.type === 'turntable'));
-export const mediaFix = (it) => (it.type === 'shelfDivider' ? { type: 'shelfDividerGrid' } : {});
+// по чертежу хозяина (ряды 518, 309, 450, 300, 300, 424, часть ячеек закрыта со стороны телевизора).
+// В v4 колонки стояли наоборот: теперь «По чертежу» — это прежний «Зеркально», поэтому у кого был выбран
+// «Зеркально», ставится «По чертежу» — стеллаж выглядит так же. «Ровные», выбранные в v4, остаются
+const OLD_MEDIA = ['media-v1', 'media-v2'];
+export const mediaDrop = (it) => OLD_MEDIA.includes(it.set) && (it.type === 'shelfDivider' || it.type === 'monitorCurved' || (it.set === 'media-v1' && it.type === 'turntable'));
+export const mediaFix = (it) => ((it.set === 'media-v3' && it.type === 'shelfDivider') || (it.set === 'media-v4' && it.type === 'shelfDividerGridM') ? { type: 'shelfDividerGrid' } : {});
 export const MEDIA_SINCE = {};   // всё было с первой версии: заново ставится только то, что заменяется
 export function mediaItems(current) {
   const set = MEDIA_SET, walnut = '#6f4d36';
