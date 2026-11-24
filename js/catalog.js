@@ -15,6 +15,7 @@ export const CATALOG = [
     { type: 'tvUnit', name: 'ТВ-тумба с нишей', w: 2682, d: 450, h: 500, color: '#e7e0d6', color2: '#6f4d36' },
     { type: 'shelfOpen', name: 'Открытые полки, внутри 45', w: 486, d: 450, h: 1900, z: 500, color: '#6f4d36' },
     { type: 'cabinetTall', name: 'Шкаф распашной 90', w: 918, d: 450, h: 2400, color: '#e7e0d6' },
+    { type: 'shelfDividerGrid', name: 'Стеллаж по чертежу', w: 350, d: 850, h: 2400, color: '#6f4d36' },
     { type: 'shelfDivider', name: 'Стеллаж-перегородка', w: 300, d: 850, h: 2400, color: '#6f4d36' },
     { type: 'slatPanel', name: 'Реечная панель', w: 700, d: 22, h: 2000, z: 500, color: '#6f4d36' },
     { type: 'soundbar', name: 'Саундбар', w: 880, d: 100, h: 65, z: 500, color: '#1f2022' },
@@ -106,7 +107,7 @@ export const SHAPES = [
   ['tableSquare', 'Стол квадратный'], ['sconceBalls', 'Бра с шариками'], ['sconceDrum', 'Бра с абажуром'], ['aircon', 'Кондиционер'],
   ['tvUnit', 'ТВ-тумба с нишей'], ['shelfOpen', 'Открытые полки'], ['cabinetTall', 'Шкаф с ручками-кнопками'],
   ['drawerUnit', 'Тумба с ящиками'], ['shelfOpenR', 'Полки, открытые справа'], ['shelfOpenL', 'Полки, открытые слева'], ['windowTop', 'Столешница у окна'], ['drawerApron', 'Ящики под столешницу'], ['shelfFramed', 'Полки в раме'], ['cabinetDoor', 'Шкаф с дверцей'],
-  ['shelfDivider', 'Стеллаж-перегородка'], ['slatPanel', 'Реечная панель'], ['soundbar', 'Саундбар'], ['turntable', 'Проигрыватель винила'], ['monitorCurved', 'Монитор изогнутый'],
+  ['shelfDividerGrid', 'Стеллаж по чертежу'], ['shelfDividerGridM', 'Стеллаж по чертежу, зеркально'], ['shelfDivider', 'Стеллаж-перегородка'], ['slatPanel', 'Реечная панель'], ['soundbar', 'Саундбар'], ['turntable', 'Проигрыватель винила'], ['monitorCurved', 'Монитор изогнутый'],
   ['chairOffice', 'Офисное кресло'], ['kettleGlass', 'Чайник'], ['microwave', 'Микроволновка'],
   ['domenicaBench', 'Тумба с нишей на ножках'], ['domenicaHanger', 'Вешалка-панель с полкой'], ['domenicaChest', 'Комод с ящиком на ножках'], ['domenicaMirror', 'Зеркало на панели с полкой'],
 ];
@@ -173,6 +174,8 @@ const ICON = {
   shelfOpen: '<rect x="10" y="14" width="24" height="16"/><path d="M13 14v13h18V14"/>',
   cabinetTall: '<rect x="6" y="14" width="32" height="16"/><path d="M6 27h32M22 27v3"/><circle cx="19" cy="24" r="1.2"/><circle cx="25" cy="24" r="1.2"/>',
   shelfDivider: '<rect x="16" y="4" width="12" height="36"/><path d="M16 22h12"/>',
+  shelfDividerGrid: '<rect x="12" y="4" width="20" height="36"/><path d="M22 4v36M12 12h20M12 18h20M12 24h20M12 32h20"/>',
+  shelfDividerGridM: '<rect x="12" y="4" width="20" height="36"/><path d="M22 4v36M12 12h20M12 18h20M12 24h20M12 32h20"/>',
   drawerUnit: '<rect x="10" y="8" width="24" height="28"/><path d="M10 31h24M14 33h16"/>',
   windowTop: '<rect x="3" y="12" width="38" height="20"/><path d="M15 15h14M15 17h14"/>',
   drawerApron: '<rect x="5" y="14" width="34" height="16" stroke-dasharray="3 2"/><path d="M22 14v16M7 27h13M24 27h13"/>',
@@ -423,6 +426,39 @@ function slimLegs(g, W, D, h) {
   }
   for (const sz of [-1, 1]) B(g, W - 0.06, 0.012, 0.02, 0, h - 0.006, sz * (D / 2 - 0.05), black);
 }
+
+// ── Стеллаж по чертежу: доски с текстурой ореха, просветы рядов — как на чертеже; если высота другая,
+// толщина досок подстраивается (12–25 мм), а дальше ряды масштабируются ──
+const GRID_ROWS = [518, 309, 450, 300, 300, 424];
+// какие ячейки закрыты со стороны телевизора: ряды снизу вверх, [у стены, со стороны комнаты]
+const GRID_CLOSED = [[1, 1], [0, 0], [0, 1], [0, 0], [1, 0], [0, 0]];
+function gridDivider(g, W, D, H, c, mirror) {
+  const rows = GRID_ROWS.map((v) => v / 1000), sum = rows.reduce((a, b) => a + b, 0), n = rows.length + 1;
+  let t = (H - sum) / n, k = 1;
+  if (t < 0.012 || t > 0.025) { t = Math.min(0.025, Math.max(0.012, t)); k = (H - n * t) / sum; }
+  const cw = (D - 3 * t) / 2, back = 0.012;
+  for (const z of [-D / 2 + t / 2, 0, D / 2 - t / 2]) WB(g, W, H, t, 0, H / 2, z, c);    // стойки: у стены, посередине, у комнаты
+  let y = 0;
+  for (let i = 0; i < n; i++) {
+    WB(g, W, t, D - 2 * t, 0, y + t / 2, 0, c);                                          // дно, полки, крышка
+    if (i === rows.length) break;
+    const rh = rows[i] * k, y0 = y + t;
+    for (let col = 0; col < 2; col++) {
+      if (!GRID_CLOSED[i][mirror ? 1 - col : col]) continue;
+      const zc = col === 0 ? -D / 2 + t + cw / 2 : D / 2 - t - cw / 2;
+      WB(g, back, rh, cw, -W / 2 + back / 2, y0 + rh / 2, zc, c);                        // стенка со стороны телевизора
+    }
+    y = y0 + rh;
+  }
+}
+
+// взаимозаменяемые виды одного предмета: в карточке — строка «Вид», меняется только тип (место и размеры те же)
+export const VARIANTS = [
+  [['shelfDividerGrid', 'По чертежу', 'Полки по чертежу: часть ячеек закрыта со стороны телевизора'],
+   ['shelfDividerGridM', 'Зеркально', 'То же, но колонки наоборот: у стены ↔ со стороны комнаты'],
+   ['shelfDivider', 'Ровные', 'Ровные полки без стенок, как было раньше']],
+];
+export const variantsOf = (type) => VARIANTS.find((v) => v.some(([t]) => t === type)) || null;
 
 // коробка по границам (x0..x1, y0..y1, z0..z1)
 const BX = (g, x0, x1, y0, y1, z0, z1, m) => B(g, x1 - x0, y1 - y0, z1 - z0, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, m);
@@ -802,6 +838,12 @@ const BUILD = {
 
   shelfOpenR(g, W, D, H, c) { flowerShelves(g, W, D, H, c, 1); },    // открыты справа
   shelfOpenL(g, W, D, H, c) { flowerShelves(g, W, D, H, c, -1); },   // открыты слева
+
+  // стеллаж по чертежу хозяина (вид со стороны компьютера, стена справа): две колонки по 850 / 2, шесть рядов,
+  // просветы снизу 518, 309, 450, 300, 300, 424 мм. Часть ячеек закрыта стенкой со стороны телевизора (−X),
+  // со стороны компьютера (+X) открыты все. Зеркально — колонки наоборот (у стены ↔ со стороны комнаты)
+  shelfDividerGrid(g, W, D, H, c) { gridDivider(g, W, D, H, c, false); },
+  shelfDividerGridM(g, W, D, H, c) { gridDivider(g, W, D, H, c, true); },
 
   shelfDivider(g, W, D, H, c) {
     // стеллаж-перегородка: открыт с обеих сторон; торцевые стойки (у стены и со стороны комнаты),

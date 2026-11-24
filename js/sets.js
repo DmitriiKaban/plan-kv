@@ -169,18 +169,20 @@ export function tvwallItems(current) {
 
 // Гостиная, дополнения к столу и тумбе:
 // · стеллаж-перегородка между тумбой и рабочим столом: ширина 35 см, длина на 15 см больше глубины стола,
-//   высоту не называли — 2400, как шкаф и полки;
+//   высоту не называли — 2400, как шкаф и полки; полки по чертежу хозяина (в карточке можно сменить вид);
 // · реечная панель (по фото) рядом с телевизором, со стороны стола: от тумбы до потолка;
 // · саундбар на тумбе под телевизором;
 // · проигрыватель Sony PS-LX310BT (43 × 10,8 × 36,7 см) на полке с розеткой в открытых полках;
 // · монитор AOC CU34V5CW (80,8 × 25 × 41–54 см) на рабочем столе.
 // current — предметы варианта: всё ставится возле стола, тумбы и полок там, где они стоят сейчас;
 // если чего-то из них в варианте нет, то, что на нём стоит, не добавляется.
-export const MEDIA_SET = 'media-v3';
-export const MEDIA_KEEP = ['media-v1', 'media-v2'];
-// стеллаж стал 35 и встаёт заново между столом и тумбой, монитор — по центру укороченного стола,
-// проигрыватель из v1 — по центру расширенных полок
-export const mediaDrop = (it) => it.type === 'shelfDivider' || it.type === 'monitorCurved' || (it.set === 'media-v1' && it.type === 'turntable');
+export const MEDIA_SET = 'media-v4';
+export const MEDIA_KEEP = ['media-v1', 'media-v2', 'media-v3'];
+// из v1 и v2: стеллаж (стал 35) встаёт заново между столом и тумбой, монитор — по центру укороченного стола,
+// проигрыватель из v1 — по центру расширенных полок. Из v3 всё остаётся на месте, у стеллажа меняются полки —
+// по чертежу хозяина (ряды 518, 309, 450, 300, 300, 424, часть ячеек закрыта со стороны телевизора)
+export const mediaDrop = (it) => it.set !== 'media-v3' && (it.type === 'shelfDivider' || it.type === 'monitorCurved' || (it.set === 'media-v1' && it.type === 'turntable'));
+export const mediaFix = (it) => (it.type === 'shelfDivider' ? { type: 'shelfDividerGrid' } : {});
 export const MEDIA_SINCE = {};   // всё было с первой версии: заново ставится только то, что заменяется
 export function mediaItems(current) {
   const set = MEDIA_SET, walnut = '#6f4d36';
@@ -195,7 +197,7 @@ export function mediaItems(current) {
     const [dx] = local(unit, desk.x, desk.y), side = Math.sign(dx) || 1;
     const a = side * unit.w / 2, b = dx - side * desk.w / 2, sd = desk.d + 150;
     const [x, y] = at(unit, (a + b) / 2, -unit.d / 2 + sd / 2);
-    items.push({ set, type: 'shelfDivider', name: 'Стеллаж 35', w: 350, d: sd, h: 2400, z: 0, rot: unit.rot, x, y, color: walnut });
+    items.push({ set, type: 'shelfDividerGrid', name: 'Стеллаж 35', w: 350, d: sd, h: 2400, z: 0, rot: unit.rot, x, y, color: walnut });
   }
   if (unit && tv) {
     const [tx] = local(unit, tv.x, tv.y);

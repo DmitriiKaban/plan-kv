@@ -3,12 +3,12 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { PLAN } from './plan.js';
 import { Building } from './building.js';
-import { CATALOG, SHAPES, SWATCHES, HAS_TOP, TOP_SWATCHES, iconSvg, shapeName } from './catalog.js';
+import { CATALOG, SHAPES, SWATCHES, HAS_TOP, TOP_SWATCHES, iconSvg, shapeName, variantsOf } from './catalog.js';
 import { kitchenItems, kitchenApron, KITCHEN_SET, KITCHEN_OLD, KITCHEN_H, KITCHEN_RUN, KITCHEN_WALL } from './kitchen.js';
 import { bathItems, BATH_SET, BATH_OLD } from './bathroom.js';
 import { wcItems, WC_SET, heatingItems, HEAT_SET, bedroomItems, BED_SET, BED_KEEP, BED_ADD, livingItems, LIVING_SET, LIVING_OLD, LIVING_KEEP, LIVING_SINCE, livingDrop, livingFix,
   diningItems, DINING_SET, DINING_KEEP, diningFix, airconItems, AC_SET, tvwallItems, TVWALL_SET, TVWALL_KEEP, TVWALL_DROP, TVWALL_ADD,
-  mediaItems, MEDIA_SET, MEDIA_KEEP, mediaDrop, MEDIA_SINCE, studyItems, STUDY_SET, STUDY_OLD,
+  mediaItems, MEDIA_SET, MEDIA_KEEP, mediaDrop, mediaFix, MEDIA_SINCE, studyItems, STUDY_SET, STUDY_OLD,
   chairItems, CHAIRS_SET, boilerItems, BOILER_SET, applianceItems, APPL_SET, hallItems, HALL_SET } from './sets.js';
 import { Furniture, newId } from './furniture.js';
 import { WalkControls, attachJoystick } from './walk.js';
@@ -62,7 +62,7 @@ const SETS = [
   { id: DINING_SET, old: [], keep: DINING_KEEP, add: [], fix: diningFix, title: 'Стол на кухне', items: diningItems },
   { id: AC_SET, old: [], title: 'Кондиционер', items: airconItems },
   { id: TVWALL_SET, old: [], keep: TVWALL_KEEP, drop: TVWALL_DROP, add: TVWALL_ADD, title: 'Шкаф и тумба под телевизор', items: tvwallItems },
-  { id: MEDIA_SET, old: [], keep: MEDIA_KEEP, drop: mediaDrop, since: MEDIA_SINCE, title: 'Стеллаж, панели и техника', items: mediaItems },
+  { id: MEDIA_SET, old: [], keep: MEDIA_KEEP, drop: mediaDrop, fix: mediaFix, since: MEDIA_SINCE, title: 'Стеллаж, панели и техника', items: mediaItems },
   { id: STUDY_SET, old: STUDY_OLD, title: 'Стол у окна в спальне', items: studyItems },
   { id: CHAIRS_SET, old: [], title: 'Стулья к столам', items: chairItems },
   { id: BOILER_SET, old: [], title: 'Бойлер', items: boilerItems },
@@ -90,9 +90,11 @@ for (const set of SETS) {
     if (!keep.length) continue;
     // дополнение: заново ставится то, что заменяется (по типу предмета), и то, чего в той версии набора ещё не было;
     // удалённое хозяином не возвращается. Без since — по старому правилу: всё недостающее (или только из add)
-    const names = new Set(mine.map((it) => it.name)), redo = new Set(dropped.map((it) => it.type));
+    // вид одного предмета (например, стеллаж по чертежу или с ровными полками) считается тем же типом
+    const fam = (t) => (variantsOf(t) || [[t]])[0][0];
+    const names = new Set(mine.map((it) => it.name)), redo = new Set(dropped.map((it) => fam(it.type)));
     const fresh = (it) => (set.since ? from < vnum(set.since[it.type]) : !set.add || set.add.includes(it.name));
-    l.items.push(...Store.cleanItems(set.items(l.items).filter((it) => !names.has(it.name) && (redo.has(it.type) || fresh(it)))));
+    l.items.push(...Store.cleanItems(set.items(l.items).filter((it) => !names.has(it.name) && (redo.has(fam(it.type)) || fresh(it)))));
   }
   state.sets[set.id] = true;
   (replaces ? setsUpdated : setsJustAdded).push(set.title.toLowerCase());
@@ -541,6 +543,10 @@ function fillInspector(it = furniture.selected, force = false) {
     msgs.map((m) => `<span class="${m.kind === 'door' ? 'door' : 'bad'}">${esc(cap(m.text))}</span>`).join('');
   $$('#insColors button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === it.color)));
   $('#insTopRow').hidden = !HAS_TOP.has(it.type);
+  // вид предмета (например, стеллаж: по чертежу, зеркально, ровные полки)
+  const vars = variantsOf(it.type);
+  $('#insVarRow').hidden = !vars;
+  if (vars) $('#insVar').innerHTML = vars.map(([t, n, hint]) => `<button data-t="${t}" title="${esc(hint || n)}" aria-pressed="${t === it.type}">${esc(n)}</button>`).join('');
   $$('#insTop button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === (it.color2 || '#cfc6b8'))));
   const ci = $('#insColors input'); if (ci && document.activeElement !== ci) ci.value = it.color;
 }
@@ -575,6 +581,12 @@ function bindInspector() {
   const tops = $('#insTop');
   tops.innerHTML = TOP_SWATCHES.map(([c, n]) => `<button data-c="${c}" style="background:${c}" title="${n}" aria-label="Столешница: ${n}"></button>`).join('');
   tops.addEventListener('click', (e) => { const b = e.target.closest('button'); const it = sel(); if (b && it) furniture.update(it.id, { color2: b.dataset.c }); });
+  $('#insVar').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-t]'), it = sel();
+    if (!b || !it || b.dataset.t === it.type) return;
+    furniture.update(it.id, { type: b.dataset.t }); furniture.reselect();
+    toast(`${it.name}: ${b.textContent.toLowerCase()}`);
+  });
   const ci = colors.querySelector('input');
   ci.addEventListener('input', () => { const it = sel(); if (it) { furniture.update(it.id, { color: ci.value }, false); furniture.reselect(); } });
   ci.addEventListener('change', () => commitHistory());
@@ -649,7 +661,7 @@ function renderSetCard() {
     [DINING_SET]: { sw: ['#a27c58', '#fbfaf6', '#b8955a'], text: 'Стол 80 × 80 в углу, в 20 см от окна, над ним бра с шариками 40 см' },
     [AC_SET]: { sw: ['#f7f7f5', '#e9e9e6', '#3a3d40'], text: 'В прихожей под потолком, между дверью в гостиную и углом спальни' },
     [TVWALL_SET]: { sw: ['#e7e0d6', '#6f4d36', '#1c1d1f'], text: 'По чертежу, 3,6 м вдоль левой стены гостиной от угла: шкаф 90, тумба 268, полки внутри 45, телевизор' },
-    [MEDIA_SET]: { sw: ['#6f4d36', '#1c1c1d', '#1b1c1e'], text: 'Стеллаж 35 между тумбой и столом, рейки у телевизора, саундбар, проигрыватель, монитор' },
+    [MEDIA_SET]: { sw: ['#6f4d36', '#1c1c1d', '#1b1c1e'], text: 'Стеллаж 35 по чертежу между тумбой и столом, рейки у телевизора, саундбар, проигрыватель, монитор' },
     [STUDY_SET]: { sw: ['#f1f1ee', '#cfb38e', '#4a4642'], text: 'Глубина 50 см, столешница — продолжение подоконника; по бокам шкафы 30 и полки для цветов 17, внизу ящики' },
     [CHAIRS_SET]: { sw: ['#1d1e20', '#3a3c3f', '#9a9ea3'], text: 'Кресло с подголовником — за рабочий стол в гостиной, компьютерный стул — к столу у окна в спальне' },
     [BOILER_SET]: { sw: ['#f4f4f2', '#dfe1e2', '#4fb6ff'], text: '⌀38,5 × 77 на стене за унитазом, низ на 1,45 м' },
